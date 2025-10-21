@@ -1,0 +1,68 @@
+// Prisma Schema for Treasureby Platform
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  CREATOR
+  USER
+}
+
+model User {
+  id          String   @id @default(uuid())
+  email       String   @unique
+  username    String   @unique
+  displayName String
+  password    String
+  role        UserRole @default(USER)
+  isCreator   Boolean  @default(false)
+  verified    Boolean  @default(false)
+  avatarUrl   String?
+  bio         String?
+
+  // Social Media Links
+  socialTwitter   String?
+  socialInstagram String?
+  socialYoutube   String?
+  socialLinkedin  String?
+  socialGithub    String?
+  socialWebsite   String?
+
+  // Social Media Follower Counts
+  twitterFollowers    Int?
+  instagramFollowers  Int?
+  youtubeSubscribers  Int?
+  linkedinConnections Int?
+  githubFollowers     Int?
+
+  // Timestamps
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  // Relations
+  refreshTokens RefreshToken[]
+
+  @@index([email])
+  @@index([username])
+  @@index([deletedAt])
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+}

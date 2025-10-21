@@ -1,0 +1,314 @@
+// Prisma Schema for Treasureby Platform - Complete
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  CREATOR
+  USER
+}
+
+enum AssetType {
+  PDF
+  VIDEO
+  IMAGE
+  AI_PROMPT
+  ZIP
+  AUDIO
+  EBOOK
+  TEMPLATE
+  PLUGIN
+  FONT
+}
+
+enum AssetCategory {
+  DESIGN
+  DEVELOPMENT
+  BUSINESS
+  MARKETING
+  PHOTOGRAPHY
+  VIDEO_AUDIO
+  EDUCATION
+  AI_ML
+  GRAPHICS
+  OTHER
+}
+
+enum Currency {
+  USD
+  EUR
+  GBP
+  INR
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  RAZORPAY
+  PAYPAL
+  STRIPE
+  CREDIT_CARD
+}
+
+enum NotificationType {
+  LIKE
+  COMMENT
+  PURCHASE
+  FOLLOW
+  SYSTEM
+}
+
+enum ProfileVisibility {
+  PUBLIC
+  PRIVATE
+  FRIENDS
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  username      String    @unique
+  displayName   String
+  password      String
+  role          UserRole  @default(USER)
+  isCreator     Boolean   @default(false)
+  verified      Boolean   @default(false)
+  avatarUrl     String?
+  bio           String?
+
+  socialTwitter         String?
+  socialInstagram       String?
+  socialYoutube         String?
+  socialLinkedin        String?
+  socialGithub          String?
+  socialWebsite         String?
+
+  twitterFollowers      Int?
+  instagramFollowers    Int?
+  youtubeSubscribers    Int?
+  linkedinConnections   Int?
+  githubFollowers       Int?
+
+  emailNotifications    Boolean @default(true)
+  pushNotifications     Boolean @default(true)
+  marketingEmails       Boolean @default(false)
+  notifyNewFollowers    Boolean @default(true)
+  notifyComments        Boolean @default(true)
+  notifyLikes           Boolean @default(true)
+  notifyPurchases       Boolean @default(true)
+
+  profileVisibility     ProfileVisibility @default(PUBLIC)
+  showEmail             Boolean @default(false)
+  showPurchases         Boolean @default(true)
+  allowMessages         Boolean @default(true)
+
+  currency              Currency @default(USD)
+  paypalEmail           String?
+  stripeConnected       Boolean @default(false)
+  razorpayConnected     Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  refreshTokens         RefreshToken[]
+  assets                Asset[]
+  purchases             Transaction[] @relation("buyer")
+  sales                 Transaction[] @relation("seller")
+  comments              Comment[]
+  likes                 Like[]
+  notifications         Notification[]
+  followedBy            Follow[] @relation("following")
+  following             Follow[] @relation("follower")
+
+  @@index([email])
+  @@index([username])
+  @@index([deletedAt])
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+}
+
+model Asset {
+  id            String        @id @default(uuid())
+  type          AssetType
+  category      AssetCategory
+  title         String
+  description   String        @db.Text
+
+  creatorId     String
+  creator       User          @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+
+  price         Float         @default(0)
+  isFree        Boolean       @default(false)
+  currency      Currency      @default(USD)
+  discount      Float?
+
+  thumbnailUrl  String
+  fileUrl       String?
+  previewImages String[]
+
+  fileSize      String?
+  version       String?
+
+  likes         Int           @default(0)
+  downloads     Int           @default(0)
+  views         Int           @default(0)
+  rating        Float         @default(0)
+  reviewCount   Int           @default(0)
+
+  tags          String[]
+
+  featured      Boolean       @default(false)
+  trending      Boolean       @default(false)
+  verified      Boolean       @default(false)
+
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  deletedAt     DateTime?
+
+  comments      Comment[]
+  assetLikes    Like[]
+  transactions  Transaction[]
+
+  @@index([creatorId])
+  @@index([category])
+  @@index([type])
+  @@index([isFree])
+  @@index([featured])
+  @@index([trending])
+  @@index([deletedAt])
+  @@index([createdAt])
+}
+
+model Comment {
+  id          String    @id @default(uuid())
+  text        String    @db.Text
+
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  assetId     String
+  asset       Asset     @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  parentId    String?
+  parent      Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies     Comment[] @relation("CommentReplies")
+
+  likes       Int       @default(0)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  @@index([assetId])
+  @@index([userId])
+  @@index([parentId])
+  @@index([deletedAt])
+}
+
+model Like {
+  id        String   @id @default(uuid())
+
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  assetId   String
+  asset     Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, assetId])
+  @@index([assetId])
+  @@index([userId])
+}
+
+model Follow {
+  id          String   @id @default(uuid())
+
+  followerId  String
+  follower    User     @relation("follower", fields: [followerId], references: [id], onDelete: Cascade)
+
+  followingId String
+  following   User     @relation("following", fields: [followingId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime @default(now())
+
+  @@unique([followerId, followingId])
+  @@index([followerId])
+  @@index([followingId])
+}
+
+model Transaction {
+  id              String            @id @default(uuid())
+
+  buyerId         String
+  buyer           User              @relation("buyer", fields: [buyerId], references: [id], onDelete: Cascade)
+
+  sellerId        String
+  seller          User              @relation("seller", fields: [sellerId], references: [id], onDelete: Cascade)
+
+  assetId         String
+  asset           Asset             @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  amount          Float
+  currency        Currency          @default(USD)
+  paymentMethod   PaymentMethod
+  status          TransactionStatus @default(PENDING)
+
+  razorpayOrderId   String?
+  razorpayPaymentId String?
+  paypalOrderId     String?
+  stripePaymentId   String?
+
+  createdAt       DateTime          @default(now())
+  completedAt     DateTime?
+
+  @@index([buyerId])
+  @@index([sellerId])
+  @@index([assetId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model Notification {
+  id          String           @id @default(uuid())
+
+  userId      String
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  type        NotificationType
+  title       String
+  message     String           @db.Text
+  read        Boolean          @default(false)
+  actionUrl   String?
+
+  fromUserId  String?
+
+  createdAt   DateTime         @default(now())
+
+  @@index([userId])
+  @@index([read])
+  @@index([createdAt])
+}
