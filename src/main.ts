@@ -16,10 +16,10 @@ async function bootstrap(): Promise<void> {
   const apiPrefix = configService.get('API_PREFIX', 'api');
   app.setGlobalPrefix(apiPrefix);
 
-  // Configure Helmet with CORS-friendly settings
+  // 🛡️ Helmet Security
   app.use(
     helmet({
-      crossOriginResourcePolicy: { policy: 'cross-origin' }, // Critical: Allow cross-origin resources
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
       crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' },
       contentSecurityPolicy: {
         directives: {
@@ -35,7 +35,7 @@ async function bootstrap(): Promise<void> {
     }),
   );
 
-  // Enable CORS with comprehensive configuration
+  // 🌐 Enable CORS
   app.enableCors({
     origin: [
       configService.get('CORS_ORIGIN', 'http://localhost:4200'),
@@ -56,19 +56,19 @@ async function bootstrap(): Promise<void> {
     maxAge: 3600,
   });
 
+  // 🧹 Global Pipes & Filters
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
       forbidNonWhitelisted: true,
       transform: true,
-      transformOptions: {
-        enableImplicitConversion: true,
-      },
+      transformOptions: { enableImplicitConversion: true },
     }),
   );
 
   app.useGlobalFilters(new HttpExceptionFilter());
 
+  // 📘 Swagger Documentation
   const config = new DocumentBuilder()
     .setTitle('Treasureby API')
     .setDescription('REST API for Treasureby - Digital Asset Marketplace Platform')
@@ -86,14 +86,18 @@ async function bootstrap(): Promise<void> {
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup(apiPrefix + '/docs', app, document);
+  SwaggerModule.setup(`${apiPrefix}/docs`, app, document);
 
+  // ⚙️ Determine Port & Host
   const port = configService.get('PORT', 3000);
-  await app.listen(port);
+  const host = process.env.FLY_APP_NAME ? '0.0.0.0' : 'localhost'; // 👈 Detect Fly.io
 
-  console.log('🚀 Treasureby API Server started on port ' + port);
-  console.log('📚 API Docs: http://localhost:' + port + '/' + apiPrefix + '/docs');
-  console.log('🔐 CORS enabled for: ' + configService.get('CORS_ORIGIN', 'http://localhost:4200'));
+  await app.listen(port, host);
+
+  // 🖥️ Logs
+  console.log(`🚀 Treasureby API Server running on http://${host}:${port}/${apiPrefix}`);
+  console.log(`📚 Swagger Docs available at http://${host}:${port}/${apiPrefix}/docs`);
+  console.log(`🔐 CORS enabled for: ${configService.get('CORS_ORIGIN', 'http://localhost:4200')}`);
 }
 
 bootstrap();

@@ -1,25 +1,26 @@
-app = "tb-backend"
-primary_region = "bom"
+# fly.toml app configuration file generated for tb-backend on 2025-10-24T01:58:04+05:30
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'tb-backend'
+primary_region = 'bom'
 
 [build]
-  dockerfile = "./Dockerfile"
 
-[env]
-  NODE_ENV = "production"
-  PORT = "8080"
+[deploy]
+  release_command = "npx prisma migrate deploy"
+  wait_timeout = "600s"
 
-[[services]]
-  internal_port = 8080
-  processes = ["app"]
-  protocol = "tcp"
-  auto_stop_machines = false
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = 'stop'
   auto_start_machines = true
-  min_machines_running = 1
+  min_machines_running = 0
+  processes = ['app']
 
-  [[services.ports]]
-    handlers = ["http"]
-    port = 80
-
-  [[services.ports]]
-    handlers = ["tls", "http"]
-    port = 443
+[[vm]]
+  memory = '1gb'
+  cpu_kind = 'shared'
+  cpus = 1
