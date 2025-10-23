@@ -38,7 +38,7 @@ async function bootstrap(): Promise<void> {
   // 🌐 Enable CORS
   app.enableCors({
     origin: [
-      configService.get('CORS_ORIGIN', 'http://localhost:4200'),
+      configService.get('CORS_ORIGIN', 'https://treasureby.vercel.app'),
       'http://localhost:4200',
       'http://localhost:3000',
     ],
@@ -97,7 +97,7 @@ async function bootstrap(): Promise<void> {
   // 🖥️ Logs
   console.log(`🚀 Treasureby API Server running on http://${host}:${port}/${apiPrefix}`);
   console.log(`📚 Swagger Docs available at http://${host}:${port}/${apiPrefix}/docs`);
-  console.log(`🔐 CORS enabled for: ${configService.get('CORS_ORIGIN', 'http://localhost:4200')}`);
+  console.log(`🔐 CORS enabled for: ${configService.get('CORS_ORIGIN', 'https://treasureby.vercel.app')}`);
 }
 
 bootstrap();
