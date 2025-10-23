@@ -1,87 +1,32 @@
-# Treasureby Backend API
+# 🪙 Treasureby Backend API
 
-Production-ready NestJS backend infrastructure for the Treasureby digital asset marketplace platform.
+> “Every great idea deserves a backend that believes in it.”
 
-## Features Implemented
+> “Built not just with logic — but with late nights, caffeine, and a bit of
+> hope.” ☕
 
-### Core Infrastructure
-- NestJS 11+ with modular architecture following SOLID principles
-- TypeScript Strict Mode for maximum type safety
-- PostgreSQL + Prisma ORM for type-safe database access
-- Cloudflare R2 (S3-compatible) storage for file uploads
-- Redis Cache for performance optimization
-- Environment Configuration for development and production
+> “Behind every button click, there’s a quiet hero handling chaos gracefully.”
 
-### Authentication & Security
-- JWT Authentication with access tokens (15min) and refresh tokens (7 days)
-- Google OAuth integration (optional)
-- Role-Based Access Control (RBAC) with custom decorators
-- Helmet for HTTP security headers
-- CORS configuration
-- Rate Limiting with ThrottlerModule
-- Request Validation using class-validator on all DTOs
+> “Developers write code. Builders write stories in logic.”
 
-### API Features
-- OpenAPI/Swagger documentation at /api/docs
-- Centralized Error Handling with custom exception filters
-- Standardized Pagination (page, limit, sort, order, search)
-- Soft Delete functionality with deletedAt timestamp
-- Global Validation Pipe with DTO transformation
+> “If it doesn’t scale, it’s just a demo. If it inspires, it’s a startup.” 🚀
 
-## Quick Start
+> “Treasureby isn’t built to impress — it’s built to empower.”
 
-1. Install dependencies:
-```bash
-npm install
-```
+> “Simple, strong, and slightly obsessed with perfection.”
 
-2. Configure environment:
-```bash
-cp .env.example .env
-# Edit .env with your configuration
-```
+> “Because every treasure deserves a vault that never cracks.” 💎
 
-3. Run database migrations:
-```bash
-npx prisma migrate dev
-```
+> “The code runs on caffeine. The vision runs on purpose.”
 
-4. Start development server:
-```bash
-npm run start:dev
-```
+> “Sometimes you don’t need motivation. You just need to deploy.”
 
-5. Access API documentation:
-- Server: http://localhost:3000
-- Swagger: http://localhost:3000/api/docs
+> “Made by humans, for humans — with a bit of machine elegance.” 🤖❤️
 
-## Environment Variables
+> “Start small. Ship often. Dream ridiculously big.”
 
-See .env.example for all required configuration options.
+> “This is where creators meet infrastructure — and magic happens quietly.” ✨
 
-Key variables:
-- DATABASE_URL - PostgreSQL connection string
-- JWT_ACCESS_SECRET - JWT access token secret
-- JWT_REFRESH_SECRET - JWT refresh token secret
-- REDIS_HOST - Redis server host (optional)
-- R2_* - Cloudflare R2 storage credentials (optional)
+> “If you’re reading this, you’re already part of the story.”
 
-## API Endpoints
-
-### Authentication
-- POST /api/auth/register - Register new user
-- POST /api/auth/login - Login user
-- POST /api/auth/refresh - Refresh access token
-- POST /api/auth/logout - Logout user
-- GET /api/auth/profile - Get current user (protected)
-
-Full API documentation available at /api/docs when running.
-
-## Build & Deploy
-
-```bash
-npm run build    # Build for production
-npm run start:prod  # Run in production mode
-```
-
-Built with NestJS 11+ - TypeScript Strict Mode - Production Ready
+---

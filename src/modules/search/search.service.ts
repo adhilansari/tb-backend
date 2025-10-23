@@ -34,30 +34,30 @@ export class SearchService {
 
   async searchCreators(query: string, page: number = 1, limit: number = 20) {
     const skip = (page - 1) * limit;
+
+    // Build where clause - if no query, return all creators
+    const where: any = {
+      role: 'CREATOR',
+      deletedAt: null,
+    };
+
+    // Only add OR filter if query is provided
+    if (query && query.trim()) {
+      where.OR = [
+        { username: { contains: query, mode: 'insensitive' } },
+        { displayName: { contains: query, mode: 'insensitive' } },
+      ];
+    }
+
     const [creators, total] = await Promise.all([
       this.prisma.user.findMany({
-        where: {
-          isCreator: true,
-          deletedAt: null,
-          OR: [
-            { username: { contains: query, mode: 'insensitive' } },
-            { displayName: { contains: query, mode: 'insensitive' } },
-          ],
-        },
+        where,
         skip,
         take: limit,
         select: { id: true, username: true, displayName: true, avatarUrl: true, verified: true, bio: true },
+        orderBy: { createdAt: 'desc' }, // Order by newest first when no query
       }),
-      this.prisma.user.count({
-        where: {
-          isCreator: true,
-          deletedAt: null,
-          OR: [
-            { username: { contains: query, mode: 'insensitive' } },
-            { displayName: { contains: query, mode: 'insensitive' } },
-          ],
-        },
-      }),
+      this.prisma.user.count({ where }),
     ]);
 
     return { data: creators, meta: { page, limit, total } };

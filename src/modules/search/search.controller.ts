@@ -37,11 +37,11 @@ export class SearchController {
   @Public()
   @Get('creators')
   @ApiOperation({ summary: 'Search creators' })
-  @ApiQuery({ name: 'query', required: true, type: String })
+  @ApiQuery({ name: 'query', required: false, type: String })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   async searchCreators(
-    @Query('query') query: string,
+    @Query('query') query: string = '',
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
     @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
   ) {

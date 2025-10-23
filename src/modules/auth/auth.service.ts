@@ -55,7 +55,7 @@ export class AuthService {
         displayName: registerDto.displayName,
         password: hashedPassword,
         bio: registerDto.bio,
-        isCreator: registerDto.isCreator ?? false,
+        role: registerDto.isCreator ? 'CREATOR' : 'USER',
       },
       select: {
         id: true,
@@ -63,7 +63,6 @@ export class AuthService {
         username: true,
         displayName: true,
         role: true,
-        isCreator: true,
         createdAt: true,
       },
     });

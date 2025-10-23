@@ -12,7 +12,7 @@ export class CreateMessageDto {
   @IsNotEmpty()
   @MinLength(1)
   @MaxLength(5000)
-  content: string;
+  content!: string;
 
   @ApiProperty({
     description: 'Optional attachment URL',
@@ -38,7 +38,7 @@ export class StartConversationDto {
   })
   @IsString()
   @IsNotEmpty()
-  receiverId: string;
+  receiverId!: string;
 
   @ApiProperty({
     description: 'Initial message content',
@@ -50,5 +50,5 @@ export class StartConversationDto {
   @IsNotEmpty()
   @MinLength(1)
   @MaxLength(5000)
-  message: string;
+  message!: string;
 }

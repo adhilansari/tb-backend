@@ -1,10 +1,15 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException, forwardRef, Inject } from '@nestjs/common';
 import { PrismaService } from '@/common/database/prisma.service';
 import { CreateMessageDto } from './dto/create-message.dto';
+import { MessagesGateway } from './messages.gateway';
 
 @Injectable()
 export class MessagesService {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(forwardRef(() => MessagesGateway))
+    private readonly messagesGateway: MessagesGateway,
+  ) { }
 
   /**
    * Get or create conversation between two users
@@ -47,7 +52,7 @@ export class MessagesService {
             username: true,
             displayName: true,
             avatarUrl: true,
-            isCreator: true,
+            role: true,
             verified: true,
           },
         },
@@ -57,7 +62,7 @@ export class MessagesService {
             username: true,
             displayName: true,
             avatarUrl: true,
-            isCreator: true,
+            role: true,
             verified: true,
           },
         },
@@ -78,7 +83,7 @@ export class MessagesService {
               username: true,
               displayName: true,
               avatarUrl: true,
-              isCreator: true,
+              role: true,
               verified: true,
             },
           },
@@ -88,7 +93,7 @@ export class MessagesService {
               username: true,
               displayName: true,
               avatarUrl: true,
-              isCreator: true,
+              role: true,
               verified: true,
             },
           },
@@ -120,7 +125,7 @@ export class MessagesService {
               username: true,
               displayName: true,
               avatarUrl: true,
-              isCreator: true,
+              role: true,
               verified: true,
             },
           },
@@ -130,7 +135,7 @@ export class MessagesService {
               username: true,
               displayName: true,
               avatarUrl: true,
-              isCreator: true,
+              role: true,
               verified: true,
             },
           },
@@ -192,7 +197,7 @@ export class MessagesService {
             username: true,
             displayName: true,
             avatarUrl: true,
-            isCreator: true,
+            role: true,
             verified: true,
           },
         },
@@ -202,7 +207,7 @@ export class MessagesService {
             username: true,
             displayName: true,
             avatarUrl: true,
-            isCreator: true,
+            role: true,
             verified: true,
           },
         },
@@ -249,7 +254,7 @@ export class MessagesService {
             username: true,
             displayName: true,
             avatarUrl: true,
-            isCreator: true,
+            role: true,
             verified: true,
           },
         },
@@ -272,6 +277,9 @@ export class MessagesService {
 
     // Create notification for receiver
     await this.createMessageNotification(receiverId, senderId, conversationId);
+
+    // Emit real-time message to receiver via WebSocket
+    this.messagesGateway.emitNewMessage(receiverId, message);
 
     return message;
   }
@@ -305,7 +313,7 @@ export class MessagesService {
               username: true,
               displayName: true,
               avatarUrl: true,
-              isCreator: true,
+              role: true,
               verified: true,
             },
           },
@@ -364,6 +372,9 @@ export class MessagesService {
         readAt: new Date(),
       },
     });
+
+    // Emit read receipt to other user via WebSocket
+    this.messagesGateway.emitMessageRead(otherUserId, { conversationId });
 
     return { message: 'Messages marked as read' };
   }
@@ -424,7 +435,8 @@ export class MessagesService {
    * Delete a conversation
    */
   async deleteConversation(conversationId: string, userId: string) {
-    const conversation = await this.getConversation(conversationId, userId);
+    // Verify user is participant (throws if not)
+    await this.getConversation(conversationId, userId);
 
     // Delete all messages in conversation
     await this.prisma.message.deleteMany({

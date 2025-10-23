@@ -18,7 +18,6 @@ export class AdminService {
           email: true,
           displayName: true,
           role: true,
-          isCreator: true,
           verified: true,
           createdAt: true,
         },
@@ -83,7 +82,7 @@ export class AdminService {
       totalRevenue,
     ] = await Promise.all([
       this.prisma.user.count({ where: { deletedAt: null } }),
-      this.prisma.user.count({ where: { isCreator: true, deletedAt: null } }),
+      this.prisma.user.count({ where: { role: 'CREATOR', deletedAt: null } }),
       this.prisma.asset.count({ where: { deletedAt: null } }),
       this.prisma.transaction.count({ where: { status: 'COMPLETED' } }),
       this.prisma.transaction.aggregate({

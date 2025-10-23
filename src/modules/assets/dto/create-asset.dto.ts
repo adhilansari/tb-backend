@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsString, IsNumber, IsBoolean, IsEnum, IsArray, IsOptional, Min, Max } from 'class-validator';
 import { AssetType, AssetCategory, Currency } from '@prisma/client';
+import { Transform } from 'class-transformer';
 
 export class CreateAssetDto {
   @ApiProperty({ enum: AssetType })
@@ -20,11 +21,18 @@ export class CreateAssetDto {
   description!: string;
 
   @ApiProperty({ description: 'Price in selected currency' })
+  @Transform(({ value }) => typeof value === 'string' ? parseFloat(value) : value)
   @IsNumber()
   @Min(0)
   price!: number;
 
   @ApiProperty({ description: 'Is this asset free?' })
+  @Transform(({ value }) => {
+    if (typeof value === 'string') {
+      return value === 'true' || value === '1';
+    }
+    return Boolean(value);
+  })
   @IsBoolean()
   isFree!: boolean;
 
@@ -34,12 +42,24 @@ export class CreateAssetDto {
 
   @ApiPropertyOptional({ description: 'Discount percentage', minimum: 0, maximum: 100 })
   @IsOptional()
+  @Transform(({ value }) => value ? (typeof value === 'string' ? parseFloat(value) : value) : undefined)
   @IsNumber()
   @Min(0)
   @Max(100)
   discount?: number;
 
   @ApiProperty({ description: 'Tags array', type: [String] })
+  @Transform(({ value }) => {
+    // Handle JSON string from FormData
+    if (typeof value === 'string') {
+      try {
+        return JSON.parse(value);
+      } catch {
+        return [];
+      }
+    }
+    return value;
+  })
   @IsArray()
   @IsString({ each: true })
   tags!: string[];
