@@ -9,7 +9,7 @@ import * as bcrypt from 'bcrypt';
 export class UsersService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly storage: StorageService,
+    private readonly storage: StorageService
   ) { }
 
   async findByUsername(username: string) {
@@ -52,31 +52,32 @@ export class UsersService {
   }
 
   async getUserStats(userId: string) {
-    const [assets, followers, following, totalSales, totalEarnings, totalLikes, totalViews] = await Promise.all([
-      this.prisma.asset.count({ where: { creatorId: userId, deletedAt: null } }),
-      this.prisma.follow.count({ where: { followingId: userId } }),
-      this.prisma.follow.count({ where: { followerId: userId } }),
-      this.prisma.transaction.count({ where: { sellerId: userId, status: 'COMPLETED' } }),
-      this.prisma.transaction.aggregate({
-        where: { sellerId: userId, status: 'COMPLETED' },
-        _sum: { amount: true },
-      }),
-      this.prisma.like.count({
-        where: { asset: { creatorId: userId } },
-      }),
-      this.prisma.asset.aggregate({
-        where: { creatorId: userId, deletedAt: null },
-        _sum: { views: true },
-      }),
-    ]);
+    const [assets, followers, following, totalSales, totalEarnings, totalLikes, totalViews] =
+      await Promise.all([
+        this.prisma.asset.count({ where: { creatorId: userId, deletedAt: null } }),
+        this.prisma.follow.count({ where: { followingId: userId } }),
+        this.prisma.follow.count({ where: { followerId: userId } }),
+        this.prisma.transaction.count({ where: { sellerId: userId, status: 'COMPLETED' } }),
+        this.prisma.transaction.aggregate({
+          where: { sellerId: userId, status: 'COMPLETED' },
+          _sum: { amount: true },
+        }),
+        this.prisma.like.count({
+          where: { asset: { creatorId: userId } },
+        }),
+        this.prisma.asset.aggregate({
+          where: { creatorId: userId, deletedAt: null },
+          _sum: { views: true },
+        }),
+      ]);
 
     return {
       totalUploads: assets,
-      totalSales: totalSales,
+      totalSales,
       totalEarnings: totalEarnings._sum.amount || 0,
       totalFollowers: followers,
       totalFollowing: following,
-      totalLikes: totalLikes,
+      totalLikes,
       totalViews: totalViews._sum.views || 0,
     };
   }
@@ -154,7 +155,7 @@ export class UsersService {
     return { message: 'Successfully unfollowed user' };
   }
 
-  async getFollowers(userId: string, page: number = 1, limit: number = 20) {
+  async getFollowers(userId: string, page = 1, limit = 20) {
     const skip = (page - 1) * limit;
     const [followers, total] = await Promise.all([
       this.prisma.follow.findMany({
@@ -178,8 +179,18 @@ export class UsersService {
       this.prisma.follow.count({ where: { followingId: userId } }),
     ]);
 
+    // Transform avatar URLs
+    const followersWithPresignedUrls = await Promise.all(
+      followers.map(async (f) => ({
+        ...f.follower,
+        avatarUrl: f.follower.avatarUrl
+          ? await this.storage.getPresignedUrl(f.follower.avatarUrl, 3600)
+          : null,
+      }))
+    );
+
     return {
-      data: followers.map(f => f.follower),
+      data: followersWithPresignedUrls,
       meta: {
         page,
         limit,
@@ -191,7 +202,7 @@ export class UsersService {
     };
   }
 
-  async getFollowing(userId: string, page: number = 1, limit: number = 20) {
+  async getFollowing(userId: string, page = 1, limit = 20) {
     const skip = (page - 1) * limit;
     const [following, total] = await Promise.all([
       this.prisma.follow.findMany({
@@ -215,8 +226,18 @@ export class UsersService {
       this.prisma.follow.count({ where: { followerId: userId } }),
     ]);
 
+    // Transform avatar URLs
+    const followingWithPresignedUrls = await Promise.all(
+      following.map(async (f) => ({
+        ...f.following,
+        avatarUrl: f.following.avatarUrl
+          ? await this.storage.getPresignedUrl(f.following.avatarUrl, 3600)
+          : null,
+      }))
+    );
+
     return {
-      data: following.map(f => f.following),
+      data: followingWithPresignedUrls,
       meta: {
         page,
         limit,
@@ -229,12 +250,10 @@ export class UsersService {
   }
 
   async uploadAvatar(userId: string, file: Express.Multer.File) {
-    // Validate that it's an image
     if (!file.mimetype.startsWith('image/')) {
       throw new BadRequestException('File must be an image');
     }
 
-    // Get current user to delete old avatar if exists
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { avatarUrl: true },
@@ -243,32 +262,17 @@ export class UsersService {
     // Delete old avatar from storage if it exists
     if (user?.avatarUrl) {
       try {
-        let key: string;
-
-        if (user.avatarUrl.includes('/api/files/')) {
-          const parts = user.avatarUrl.split('/api/files/');
-          key = parts[1];
-        } else if (user.avatarUrl.startsWith('http')) {
-          const url = new URL(user.avatarUrl);
-          key = url.pathname.replace(/^\//, '');
-        } else {
-          key = user.avatarUrl;
-        }
-
-        await this.storage.deleteFile(key);
+        await this.storage.deleteFile(user.avatarUrl); // Already a key
       } catch (error) {
-        console.error('Failed to delete old avatar from storage:', error);
-        // Continue with upload even if deletion fails
+        console.error('Failed to delete old avatar:', error);
       }
     }
 
-    // Upload new avatar
     const upload = await this.storage.uploadFile(file, 'avatars');
 
-    // Update user with new avatar URL
     const updatedUser = await this.prisma.user.update({
       where: { id: userId },
-      data: { avatarUrl: upload.url },
+      data: { avatarUrl: upload.key }, // Store KEY
       select: {
         id: true,
         username: true,
@@ -277,10 +281,15 @@ export class UsersService {
       },
     });
 
+    const avatarPresignedUrl = await this.storage.getPresignedUrl(updatedUser.avatarUrl!, 3600);
+
     return {
       message: 'Avatar uploaded successfully',
-      avatarUrl: updatedUser.avatarUrl,
-      user: updatedUser,
+      avatarUrl: avatarPresignedUrl,
+      user: {
+        ...updatedUser,
+        avatarUrl: avatarPresignedUrl,
+      },
     };
   }
 
@@ -294,31 +303,12 @@ export class UsersService {
       throw new BadRequestException('No avatar to remove');
     }
 
-    // Extract S3 key from stored URL
     try {
-      let key: string;
-
-      if (user.avatarUrl.includes('/api/files/')) {
-        // Extract key from /api/files/ URL
-        const parts = user.avatarUrl.split('/api/files/');
-        key = parts[1]; // e.g., "avatars/filename.jpg"
-      } else if (user.avatarUrl.startsWith('http')) {
-        // If it's a full URL, try to extract the key from the path
-        const url = new URL(user.avatarUrl);
-        key = url.pathname.replace(/^\//, ''); // Remove leading slash
-      } else {
-        // Assume it's already a key
-        key = user.avatarUrl;
-      }
-
-      // Delete the file from R2 storage
-      await this.storage.deleteFile(key);
+      await this.storage.deleteFile(user.avatarUrl); // Already a key
     } catch (error) {
       console.error('Failed to delete avatar from storage:', error);
-      // Continue with database update even if storage deletion fails
     }
 
-    // Update user to remove avatar
     await this.prisma.user.update({
       where: { id: userId },
       data: { avatarUrl: null },
@@ -371,33 +361,13 @@ export class UsersService {
     }
 
     try {
-      // Extract S3 key from the stored URL
-      // URL format: http://localhost:8080/api/files/avatars/filename.jpg
-      // We need to extract: avatars/filename.jpg
-      let key: string;
-
-      if (user.avatarUrl.includes('/api/files/')) {
-        // Extract key from /api/files/ URL
-        const parts = user.avatarUrl.split('/api/files/');
-        key = parts[1]; // e.g., "avatars/filename.jpg"
-      } else if (user.avatarUrl.startsWith('http')) {
-        // If it's a full URL, try to extract the key from the path
-        const url = new URL(user.avatarUrl);
-        key = url.pathname.replace(/^\//, ''); // Remove leading slash
-      } else {
-        // Assume it's already a key
-        key = user.avatarUrl;
-      }
-
-      // Generate presigned URL (valid for 1 hour)
-      const presignedUrl = await this.storage.getPresignedUrl(key, 3600);
-
+      // The avatarUrl is already a key stored in database
+      const presignedUrl = await this.storage.getPresignedUrl(user.avatarUrl, 3600);
       return {
         ...user,
         avatarUrl: presignedUrl,
       };
     } catch (error) {
-      // If transformation fails, return user with original avatarUrl
       console.error('Failed to transform avatar URL:', error);
       return user;
     }
@@ -409,7 +379,7 @@ export class UsersService {
     });
   }
 
-  async getLikedAssets(userId: string, page: number = 1, limit: number = 20) {
+  async getLikedAssets(userId: string, page = 1, limit = 20) {
     const skip = (page - 1) * limit;
 
     const [likes, total] = await Promise.all([
@@ -437,8 +407,25 @@ export class UsersService {
       this.prisma.like.count({ where: { userId } }),
     ]);
 
+    // Transform thumbnail and avatar URLs
+    const likesWithPresignedUrls = await Promise.all(
+      likes.map(async (like) => ({
+        ...like.asset,
+        thumbnailUrl: like.asset.thumbnailUrl
+          ? await this.storage.getPresignedUrl(like.asset.thumbnailUrl, 3600)
+          : null,
+        creator:
+          like.asset.creator && like.asset.creator.avatarUrl
+            ? {
+              ...like.asset.creator,
+              avatarUrl: await this.storage.getPresignedUrl(like.asset.creator.avatarUrl, 3600),
+            }
+            : like.asset.creator,
+      }))
+    );
+
     return {
-      data: likes.map(like => like.asset),
+      data: likesWithPresignedUrls,
       meta: {
         page,
         limit,

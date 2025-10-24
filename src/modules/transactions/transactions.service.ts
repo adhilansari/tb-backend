@@ -1,5 +1,7 @@
+// File: src/modules/transactions/transactions.service.ts
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '@/common/database/prisma.service';
+import { StorageService } from '@/common/storage/storage.service';
 import { RazorpayService } from './razorpay.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { VerifyPaymentDto } from './dto/verify-payment.dto';
@@ -9,7 +11,8 @@ export class TransactionsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly razorpayService: RazorpayService,
-  ) {}
+    private readonly storage: StorageService
+  ) { }
 
   async createOrder(userId: string, createOrderDto: CreateOrderDto) {
     const asset = await this.prisma.asset.findUnique({
@@ -46,7 +49,7 @@ export class TransactionsService {
     const razorpayOrder = await this.razorpayService.createOrder(
       createOrderDto.amount,
       createOrderDto.currency,
-      receipt,
+      receipt
     );
 
     const transaction = await this.prisma.transaction.create({
@@ -74,7 +77,7 @@ export class TransactionsService {
     const isValid = this.razorpayService.verifyPaymentSignature(
       verifyPaymentDto.razorpayOrderId,
       verifyPaymentDto.razorpayPaymentId,
-      verifyPaymentDto.razorpaySignature,
+      verifyPaymentDto.razorpaySignature
     );
 
     if (!isValid) {
@@ -117,7 +120,7 @@ export class TransactionsService {
     };
   }
 
-  async getMyPurchases(userId: string, page: number = 1, limit: number = 20) {
+  async getMyPurchases(userId: string, page = 1, limit = 20) {
     const skip = (page - 1) * limit;
 
     const [purchases, total] = await Promise.all([
@@ -151,8 +154,21 @@ export class TransactionsService {
       }),
     ]);
 
+    // Transform thumbnail URLs to presigned URLs
+    const purchasesWithPresignedUrls = await Promise.all(
+      purchases.map(async (purchase) => ({
+        ...purchase,
+        asset: purchase.asset
+          ? {
+            ...purchase.asset,
+            thumbnailUrl: await this.storage.getPresignedUrl(purchase.asset.thumbnailUrl, 3600),
+          }
+          : null,
+      }))
+    );
+
     return {
-      data: purchases,
+      data: purchasesWithPresignedUrls,
       meta: {
         page,
         limit,
@@ -164,7 +180,7 @@ export class TransactionsService {
     };
   }
 
-  async getMySales(userId: string, page: number = 1, limit: number = 20) {
+  async getMySales(userId: string, page = 1, limit = 20) {
     const skip = (page - 1) * limit;
 
     const [sales, total] = await Promise.all([
@@ -198,8 +214,21 @@ export class TransactionsService {
       }),
     ]);
 
+    // Transform thumbnail URLs to presigned URLs
+    const salesWithPresignedUrls = await Promise.all(
+      sales.map(async (sale) => ({
+        ...sale,
+        asset: sale.asset
+          ? {
+            ...sale.asset,
+            thumbnailUrl: await this.storage.getPresignedUrl(sale.asset.thumbnailUrl, 3600),
+          }
+          : null,
+      }))
+    );
+
     return {
-      data: sales,
+      data: salesWithPresignedUrls,
       meta: {
         page,
         limit,
@@ -241,6 +270,14 @@ export class TransactionsService {
 
     if (transaction.buyerId !== userId && transaction.sellerId !== userId) {
       throw new BadRequestException('You do not have access to this transaction');
+    }
+
+    // Transform thumbnail URL if asset exists
+    if (transaction.asset?.thumbnailUrl) {
+      transaction.asset.thumbnailUrl = await this.storage.getPresignedUrl(
+        transaction.asset.thumbnailUrl,
+        3600
+      );
     }
 
     return transaction;

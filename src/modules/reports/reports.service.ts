@@ -1,22 +1,28 @@
+// File: src/modules/reports/reports.service.ts
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@/common/database/prisma.service';
+import { StorageService } from '@/common/storage/storage.service';
 
 @Injectable()
 export class ReportsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly storage: StorageService
+  ) { }
 
   async getOverview(userId: string) {
-    const [totalRevenue, totalSales, totalAssets, totalViews, totalDownloads, averageRating] = await Promise.all([
-      this.prisma.transaction.aggregate({
-        where: { sellerId: userId, status: 'COMPLETED' },
-        _sum: { amount: true },
-      }),
-      this.prisma.transaction.count({ where: { sellerId: userId, status: 'COMPLETED' } }),
-      this.prisma.asset.count({ where: { creatorId: userId, deletedAt: null } }),
-      this.prisma.asset.aggregate({ where: { creatorId: userId }, _sum: { views: true } }),
-      this.prisma.asset.aggregate({ where: { creatorId: userId }, _sum: { downloads: true } }),
-      this.prisma.asset.aggregate({ where: { creatorId: userId }, _avg: { rating: true } }),
-    ]);
+    const [totalRevenue, totalSales, totalAssets, totalViews, totalDownloads, averageRating] =
+      await Promise.all([
+        this.prisma.transaction.aggregate({
+          where: { sellerId: userId, status: 'COMPLETED' },
+          _sum: { amount: true },
+        }),
+        this.prisma.transaction.count({ where: { sellerId: userId, status: 'COMPLETED' } }),
+        this.prisma.asset.count({ where: { creatorId: userId, deletedAt: null } }),
+        this.prisma.asset.aggregate({ where: { creatorId: userId }, _sum: { views: true } }),
+        this.prisma.asset.aggregate({ where: { creatorId: userId }, _sum: { downloads: true } }),
+        this.prisma.asset.aggregate({ where: { creatorId: userId }, _avg: { rating: true } }),
+      ]);
 
     const recentSales = await this.prisma.transaction.findMany({
       where: { sellerId: userId, status: 'COMPLETED' },
@@ -24,6 +30,19 @@ export class ReportsService {
       orderBy: { completedAt: 'desc' },
       include: { asset: { select: { id: true, title: true, thumbnailUrl: true } } },
     });
+
+    // Transform thumbnail URLs to presigned URLs
+    const recentSalesWithPresignedUrls = await Promise.all(
+      recentSales.map(async (sale) => ({
+        ...sale,
+        asset: sale.asset
+          ? {
+            ...sale.asset,
+            thumbnailUrl: await this.storage.getPresignedUrl(sale.asset.thumbnailUrl, 3600),
+          }
+          : null,
+      }))
+    );
 
     const topAsset = await this.prisma.asset.findFirst({
       where: { creatorId: userId },
@@ -38,12 +57,12 @@ export class ReportsService {
       totalViews: totalViews._sum.views || 0,
       totalDownloads: totalDownloads._sum.downloads || 0,
       averageRating: averageRating._avg.rating || 0,
-      recentSales,
+      recentSales: recentSalesWithPresignedUrls,
       topAsset,
     };
   }
 
-  async getMonthlyRevenue(userId: string, months: number = 12) {
+  async getMonthlyRevenue(userId: string, months = 12) {
     const startDate = new Date();
     startDate.setMonth(startDate.getMonth() - months);
 

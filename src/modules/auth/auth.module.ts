@@ -14,7 +14,7 @@ import { StorageModule } from '@/common/storage/storage.module';
     StorageModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
-      imports: [ConfigModule],
+      imports: [ConfigModule, StorageModule],
       useFactory: async (configService: ConfigService) => ({
         secret: configService.get('jwt.accessSecret'),
         signOptions: {
@@ -28,4 +28,4 @@ import { StorageModule } from '@/common/storage/storage.module';
   providers: [AuthService, JwtStrategy],
   exports: [AuthService, JwtStrategy],
 })
-export class AuthModule {}
+export class AuthModule { }

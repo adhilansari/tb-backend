@@ -1,9 +1,4 @@
-import {
-  Injectable,
-  UnauthorizedException,
-  ConflictException,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, UnauthorizedException, ConflictException, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '@/common/database/prisma.service';
@@ -20,7 +15,7 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
-    private readonly storage: StorageService,
+    private readonly storage: StorageService
   ) { }
 
   /**
@@ -30,10 +25,7 @@ export class AuthService {
     // Check if email or username already exists
     const existingUser = await this.prisma.user.findFirst({
       where: {
-        OR: [
-          { email: registerDto.email },
-          { username: registerDto.username },
-        ],
+        OR: [{ email: registerDto.email }, { username: registerDto.username }],
       },
     });
 
@@ -85,10 +77,7 @@ export class AuthService {
     // Find user by email or username
     const user = await this.prisma.user.findFirst({
       where: {
-        OR: [
-          { email: loginDto.emailOrUsername },
-          { username: loginDto.emailOrUsername },
-        ],
+        OR: [{ email: loginDto.emailOrUsername }, { username: loginDto.emailOrUsername }],
         deletedAt: null,
       },
     });
@@ -98,10 +87,7 @@ export class AuthService {
     }
 
     // Verify password
-    const isPasswordValid = await bcrypt.compare(
-      loginDto.password,
-      user.password,
-    );
+    const isPasswordValid = await bcrypt.compare(loginDto.password, user.password);
 
     if (!isPasswordValid) {
       throw new UnauthorizedException('Invalid credentials');
@@ -227,33 +213,14 @@ export class AuthService {
     }
 
     try {
-      // Extract S3 key from the stored URL
-      // URL format: http://localhost:8080/api/files/avatars/filename.jpg
-      // We need to extract: avatars/filename.jpg
-      let key: string;
-
-      if (user.avatarUrl.includes('/api/files/')) {
-        // Extract key from /api/files/ URL
-        const parts = user.avatarUrl.split('/api/files/');
-        key = parts[1]; // e.g., "avatars/filename.jpg"
-      } else if (user.avatarUrl.startsWith('http')) {
-        // If it's a full URL, try to extract the key from the path
-        const url = new URL(user.avatarUrl);
-        key = url.pathname.replace(/^\//, ''); // Remove leading slash
-      } else {
-        // Assume it's already a key
-        key = user.avatarUrl;
-      }
-
-      // Generate presigned URL (valid for 1 hour)
-      const presignedUrl = await this.storage.getPresignedUrl(key, 3600);
+      // Generate presigned URL from the stored key
+      const presignedUrl = await this.storage.getPresignedUrl(user.avatarUrl, 3600);
 
       return {
         ...user,
         avatarUrl: presignedUrl,
       };
     } catch (error) {
-      // If transformation fails, return user with original avatarUrl
       this.logger.warn('Failed to transform avatar URL:', error);
       return user;
     }

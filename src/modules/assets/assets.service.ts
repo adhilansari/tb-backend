@@ -1,4 +1,10 @@
-import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+// File: src/modules/assets/assets.service.ts
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '@/common/database/prisma.service';
 import { StorageService } from '@/common/storage/storage.service';
 import { CreateAssetDto } from './dto/create-asset.dto';
@@ -9,24 +15,29 @@ import { AssetFiltersDto } from './dto/asset-filters.dto';
 export class AssetsService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly storage: StorageService,
-  ) {}
+    private readonly storage: StorageService
+  ) { }
 
-  async create(userId: string, createAssetDto: CreateAssetDto, thumbnail: Express.Multer.File, assetFile?: Express.Multer.File) {
+  async create(
+    userId: string,
+    createAssetDto: CreateAssetDto,
+    thumbnail: Express.Multer.File,
+    assetFile?: Express.Multer.File
+  ) {
     const thumbnailUpload = await this.storage.uploadFile(thumbnail, 'thumbnails');
-    let fileUrl: string | undefined;
+    let fileKey: string | undefined;
 
     if (assetFile) {
       const fileUpload = await this.storage.uploadFile(assetFile, 'assets');
-      fileUrl = fileUpload.url;
+      fileKey = fileUpload.key; // Store the key, not the URL
     }
 
     const asset = await this.prisma.asset.create({
       data: {
         ...createAssetDto,
         creatorId: userId,
-        thumbnailUrl: thumbnailUpload.url,
-        fileUrl,
+        thumbnailUrl: thumbnailUpload.key, // Store key instead of URL
+        fileUrl: fileKey,
         fileSize: assetFile ? `${(assetFile.size / 1024 / 1024).toFixed(2)} MB` : undefined,
       },
       include: {
@@ -42,11 +53,23 @@ export class AssetsService {
       },
     });
 
-    return asset;
+    // Generate presigned URLs for the response
+    return this.transformAssetUrls(asset);
   }
 
   async findAll(filters: AssetFiltersDto) {
-    const { page = 1, limit = 20, search, type, category, isFree, minPrice, maxPrice, sortBy = 'recent', creatorId } = filters;
+    const {
+      page = 1,
+      limit = 20,
+      search,
+      type,
+      category,
+      isFree,
+      minPrice,
+      maxPrice,
+      sortBy = 'recent',
+      creatorId,
+    } = filters;
     const skip = (page - 1) * limit;
 
     const where: any = { deletedAt: null };
@@ -59,22 +82,39 @@ export class AssetsService {
       ];
     }
 
-    if (type) where.type = type;
-    if (category) where.category = category;
-    if (typeof isFree === 'boolean') where.isFree = isFree;
-    if (creatorId) where.creatorId = creatorId;
+    if (type) {
+      where.type = type;
+    }
+    if (category) {
+      where.category = category;
+    }
+    if (typeof isFree === 'boolean') {
+      where.isFree = isFree;
+    }
+    if (creatorId) {
+      where.creatorId = creatorId;
+    }
 
     if (minPrice !== undefined || maxPrice !== undefined) {
       where.price = {};
-      if (minPrice !== undefined) where.price.gte = minPrice;
-      if (maxPrice !== undefined) where.price.lte = maxPrice;
+      if (minPrice !== undefined) {
+        where.price.gte = minPrice;
+      }
+      if (maxPrice !== undefined) {
+        where.price.lte = maxPrice;
+      }
     }
 
     let orderBy: any = { createdAt: 'desc' };
-    if (sortBy === 'popular') orderBy = { views: 'desc' };
-    else if (sortBy === 'price-low') orderBy = { price: 'asc' };
-    else if (sortBy === 'price-high') orderBy = { price: 'desc' };
-    else if (sortBy === 'rating') orderBy = { rating: 'desc' };
+    if (sortBy === 'popular') {
+      orderBy = { views: 'desc' };
+    } else if (sortBy === 'price-low') {
+      orderBy = { price: 'asc' };
+    } else if (sortBy === 'price-high') {
+      orderBy = { price: 'desc' };
+    } else if (sortBy === 'rating') {
+      orderBy = { rating: 'desc' };
+    }
 
     const [assets, total] = await Promise.all([
       this.prisma.asset.findMany({
@@ -97,8 +137,13 @@ export class AssetsService {
       this.prisma.asset.count({ where }),
     ]);
 
+    // Generate presigned URLs for all assets
+    const assetsWithPresignedUrls = await Promise.all(
+      assets.map(async (asset) => this.transformAssetUrls(asset))
+    );
+
     return {
-      data: assets,
+      data: assetsWithPresignedUrls,
       meta: {
         page,
         limit,
@@ -110,8 +155,8 @@ export class AssetsService {
     };
   }
 
-  async findFeatured(limit: number = 10) {
-    return this.prisma.asset.findMany({
+  async findFeatured(limit = 10) {
+    const assets = await this.prisma.asset.findMany({
       where: { featured: true, deletedAt: null },
       take: limit,
       orderBy: { createdAt: 'desc' },
@@ -127,10 +172,12 @@ export class AssetsService {
         },
       },
     });
+
+    return Promise.all(assets.map(async (asset) => this.transformAssetUrls(asset)));
   }
 
-  async findTrending(limit: number = 10) {
-    return this.prisma.asset.findMany({
+  async findTrending(limit = 10) {
+    const assets = await this.prisma.asset.findMany({
       where: { trending: true, deletedAt: null },
       take: limit,
       orderBy: { views: 'desc' },
@@ -146,6 +193,8 @@ export class AssetsService {
         },
       },
     });
+
+    return Promise.all(assets.map(async (asset) => this.transformAssetUrls(asset)));
   }
 
   async findOne(id: string, userId?: string) {
@@ -198,11 +247,12 @@ export class AssetsService {
 
     const isLiked = userId
       ? !!(await this.prisma.like.findUnique({
-          where: { userId_assetId: { userId, assetId: id } },
-        }))
+        where: { userId_assetId: { userId, assetId: id } },
+      }))
       : false;
 
-    return { ...asset, isLiked };
+    const transformedAsset = await this.transformAssetUrls(asset);
+    return { ...transformedAsset, isLiked };
   }
 
   async update(id: string, userId: string, updateAssetDto: UpdateAssetDto) {
@@ -336,18 +386,14 @@ export class AssetsService {
     return { downloadUrl };
   }
 
-  async getMyTopAssets(userId: string, limit: number = 5) {
-    // Get assets with transaction aggregations
+  async getMyTopAssets(userId: string, limit = 5) {
     const assets = await this.prisma.asset.findMany({
       where: {
         creatorId: userId,
         deletedAt: null,
       },
       take: limit,
-      orderBy: [
-        { views: 'desc' },
-        { downloads: 'desc' },
-      ],
+      orderBy: [{ views: 'desc' }, { downloads: 'desc' }],
       select: {
         id: true,
         title: true,
@@ -361,41 +407,57 @@ export class AssetsService {
           select: {
             transactions: {
               where: {
-                status: 'COMPLETED'
-              }
-            }
-          }
+                status: 'COMPLETED',
+              },
+            },
+          },
         },
         transactions: {
           where: {
-            status: 'COMPLETED'
+            status: 'COMPLETED',
           },
           select: {
-            amount: true
-          }
-        }
+            amount: true,
+          },
+        },
       },
     });
 
-    // Calculate sales and revenue from transactions
-    const assetsWithStats = assets.map(asset => {
-      const sales = asset._count.transactions;
-      const revenue = asset.transactions.reduce((sum, t) => sum + t.amount, 0);
+    const assetsWithStats = await Promise.all(
+      assets.map(async (asset) => {
+        const sales = asset._count.transactions;
+        const revenue = asset.transactions.reduce((sum, t) => sum + t.amount, 0);
+        const thumbnailUrl = await this.storage.getPresignedUrl(asset.thumbnailUrl, 3600);
 
-      return {
-        id: asset.id,
-        title: asset.title,
-        thumbnailUrl: asset.thumbnailUrl,
-        sales,
-        revenue,
-        views: asset.views,
-        likes: asset.likes,
-        price: asset.price,
-        currency: asset.currency,
-      };
-    });
+        return {
+          id: asset.id,
+          title: asset.title,
+          thumbnailUrl,
+          sales,
+          revenue,
+          views: asset.views,
+          likes: asset.likes,
+          price: asset.price,
+          currency: asset.currency,
+        };
+      })
+    );
 
     return { data: assetsWithStats };
+  }
+
+  /**
+   * Transform asset URLs from storage keys to presigned URLs
+   */
+  private async transformAssetUrls(asset: any) {
+    const thumbnailUrl = asset.thumbnailUrl
+      ? await this.storage.getPresignedUrl(asset.thumbnailUrl, 3600)
+      : null;
+
+    return {
+      ...asset,
+      thumbnailUrl,
+    };
   }
 
   private async createNotification(userId: string, data: any) {
