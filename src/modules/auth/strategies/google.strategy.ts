@@ -21,7 +21,7 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
       super({
         clientID: 'dummy',
         clientSecret: 'dummy',
-        callbackURL: 'http://localhost:3000',
+        callbackURL: 'http://localhost:8080',
       });
       return;
     }

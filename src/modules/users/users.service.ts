@@ -372,7 +372,7 @@ export class UsersService {
 
     try {
       // Extract S3 key from the stored URL
-      // URL format: http://localhost:3000/api/files/avatars/filename.jpg
+      // URL format: http://localhost:8080/api/files/avatars/filename.jpg
       // We need to extract: avatars/filename.jpg
       let key: string;
 

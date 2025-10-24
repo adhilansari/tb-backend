@@ -32,7 +32,7 @@ async function bootstrap(): Promise<void> {
     'https://www.treasureby.com',
     'https://treasureby.com',
     'http://localhost:4200',
-    'http://localhost:3000',
+    'http://localhost:8080',
   ];
 
   app.enableCors({
