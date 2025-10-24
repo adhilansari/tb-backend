@@ -18,7 +18,7 @@ export class StorageService {
   private readonly logger = new Logger(StorageService.name);
   private readonly s3Client: S3Client;
   private readonly bucketName: string;
-  private readonly publicUrl: string;
+  private readonly isR2Enabled: boolean;
 
   // File type validation
   private readonly allowedImageTypes = [
@@ -138,25 +138,33 @@ export class StorageService {
   private readonly MAX_FILE_SIZE = 500 * 1024 * 1024; // 500MB
 
   constructor(private readonly configService: ConfigService) {
-    const r2Config = this.configService.get('storage.r2');
+    // Direct environment variable access
+    const accountId = this.configService.get<string>('R2_ACCOUNT_ID');
+    const accessKeyId = this.configService.get<string>('R2_ACCESS_KEY_ID');
+    const secretAccessKey = this.configService.get<string>('R2_SECRET_ACCESS_KEY');
+    this.bucketName = this.configService.get<string>('R2_BUCKET_NAME') || '';
 
-    this.bucketName = r2Config?.bucketName || '';
-    this.publicUrl = r2Config?.publicUrl || '';
+    // Check if R2 is properly configured
+    this.isR2Enabled = !!(accountId && accessKeyId && secretAccessKey && this.bucketName);
 
-    this.s3Client = new S3Client({
-      region: 'auto',
-      endpoint: r2Config?.endpoint,
-      credentials: {
-        accessKeyId: r2Config?.accessKeyId || '',
-        secretAccessKey: r2Config?.secretAccessKey || '',
-      },
-    });
-
-    this.logger.log('✅ Storage service initialized');
+    if (this.isR2Enabled) {
+      this.s3Client = new S3Client({
+        region: 'auto',
+        endpoint: `https://${accountId!}.r2.cloudflarestorage.com`,
+        credentials: {
+          accessKeyId: accessKeyId!,
+          secretAccessKey: secretAccessKey!,
+        },
+      });
+      this.logger.log('✅ Storage service initialized with R2');
+    } else {
+      this.logger.error('❌ R2 configuration missing - storage service will fail');
+      throw new Error('R2 storage not configured. Please set R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, and R2_BUCKET_NAME');
+    }
   }
 
   /**
-   * Upload file to R2
+   * Upload file to R2 and return presigned URL
    */
   async uploadFile(
     file: Express.Multer.File,
@@ -180,24 +188,46 @@ export class StorageService {
 
       await this.s3Client.send(command);
 
-      const url = `${this.publicUrl}/${key}`;
-      this.logger.log(`File uploaded successfully: ${key}`);
+      // Generate presigned URL with 1 year expiry for stored URLs
+      // For thumbnails and avatars, we want long-lived URLs
+      const url = await this.getPresignedUrl(key, 31536000); // 1 year = 365 days
+
+      this.logger.log(`✅ File uploaded: ${key}`);
 
       return { key, url };
     } catch (error) {
-      this.logger.error(`Failed to upload file: ${error}`);
+      this.logger.error(`❌ Failed to upload file: ${error}`);
       throw new Error(`File upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
   /**
    * Generate presigned URL for temporary access
+   * Can accept either a key or a full URL (extracts key from URL)
    */
   async getPresignedUrl(
-    key: string,
+    keyOrUrl: string,
     expiresIn: number = 3600,
   ): Promise<string> {
     try {
+      // Extract key if a full URL was passed
+      let key = keyOrUrl;
+
+      // Check if it's already a presigned URL (has query params)
+      if (keyOrUrl.includes('?X-Amz-')) {
+        // Extract the path before query params
+        const urlObj = new URL(keyOrUrl);
+        key = urlObj.pathname.substring(1); // Remove leading slash
+      } else if (keyOrUrl.includes('cloudflarestorage.com')) {
+        // Extract key from R2 URL
+        const urlObj = new URL(keyOrUrl);
+        key = urlObj.pathname.substring(1); // Remove leading slash
+      } else if (keyOrUrl.startsWith('http')) {
+        // It's some other URL, return as-is (local URLs, etc.)
+        this.logger.warn(`Cannot generate presigned URL for external URL: ${keyOrUrl}`);
+        return keyOrUrl;
+      }
+
       const command = new GetObjectCommand({
         Bucket: this.bucketName,
         Key: key,
@@ -206,25 +236,37 @@ export class StorageService {
       const url = await getSignedUrl(this.s3Client, command, { expiresIn });
       return url;
     } catch (error) {
-      this.logger.error(`Failed to generate presigned URL: ${error}`);
+      this.logger.error(`❌ Failed to generate presigned URL for ${keyOrUrl}: ${error}`);
       throw new Error('Failed to generate download URL');
     }
   }
 
   /**
    * Delete file from R2
+   * Can accept either a key or a full URL (extracts key from URL)
    */
-  async deleteFile(key: string): Promise<void> {
+  async deleteFile(keyOrUrl: string): Promise<void> {
     try {
+      // Extract key if a full URL was passed
+      let key = keyOrUrl;
+
+      if (keyOrUrl.includes('cloudflarestorage.com')) {
+        const urlObj = new URL(keyOrUrl);
+        key = urlObj.pathname.substring(1);
+      } else if (keyOrUrl.includes('?X-Amz-')) {
+        const urlObj = new URL(keyOrUrl);
+        key = urlObj.pathname.substring(1);
+      }
+
       const command = new DeleteObjectCommand({
         Bucket: this.bucketName,
         Key: key,
       });
 
       await this.s3Client.send(command);
-      this.logger.log(`File deleted successfully: ${key}`);
+      this.logger.log(`✅ File deleted: ${key}`);
     } catch (error) {
-      this.logger.error(`Failed to delete file: ${error}`);
+      this.logger.error(`❌ Failed to delete file: ${error}`);
       throw new Error(`File deletion failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -232,8 +274,16 @@ export class StorageService {
   /**
    * Check if file exists
    */
-  async fileExists(key: string): Promise<boolean> {
+  async fileExists(keyOrUrl: string): Promise<boolean> {
     try {
+      // Extract key if a full URL was passed
+      let key = keyOrUrl;
+
+      if (keyOrUrl.includes('cloudflarestorage.com') || keyOrUrl.includes('?X-Amz-')) {
+        const urlObj = new URL(keyOrUrl);
+        key = urlObj.pathname.substring(1);
+      }
+
       const command = new HeadObjectCommand({
         Bucket: this.bucketName,
         Key: key,
@@ -243,6 +293,37 @@ export class StorageService {
       return true;
     } catch (error) {
       return false;
+    }
+  }
+
+  /**
+   * Get file metadata
+   */
+  async getFileMetadata(keyOrUrl: string): Promise<any> {
+    try {
+      // Extract key if a full URL was passed
+      let key = keyOrUrl;
+
+      if (keyOrUrl.includes('cloudflarestorage.com') || keyOrUrl.includes('?X-Amz-')) {
+        const urlObj = new URL(keyOrUrl);
+        key = urlObj.pathname.substring(1);
+      }
+
+      const command = new HeadObjectCommand({
+        Bucket: this.bucketName,
+        Key: key,
+      });
+
+      const response = await this.s3Client.send(command);
+      return {
+        contentType: response.ContentType,
+        contentLength: response.ContentLength,
+        lastModified: response.LastModified,
+        metadata: response.Metadata,
+      };
+    } catch (error) {
+      this.logger.error(`❌ Failed to get file metadata: ${error}`);
+      throw new Error('Failed to get file metadata');
     }
   }
 
@@ -297,5 +378,20 @@ export class StorageService {
       .toLowerCase();
 
     return `${folder}/${nameWithoutExt}-${timestamp}-${random}.${extension}`;
+  }
+
+  /**
+   * Helper method to extract key from R2 URL
+   */
+  extractKeyFromUrl(url: string): string {
+    try {
+      if (url.includes('cloudflarestorage.com') || url.includes('?X-Amz-')) {
+        const urlObj = new URL(url);
+        return urlObj.pathname.substring(1); // Remove leading slash
+      }
+      return url; // Already a key
+    } catch (error) {
+      return url; // If URL parsing fails, assume it's already a key
+    }
   }
 }
