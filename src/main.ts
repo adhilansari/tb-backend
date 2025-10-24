@@ -13,10 +13,11 @@ async function bootstrap(): Promise<void> {
 
   const configService = app.get(ConfigService);
 
+  // 🌍 Prefix for API routes
   const apiPrefix = configService.get('API_PREFIX', 'api');
   app.setGlobalPrefix(apiPrefix);
 
-  // 🛡️ Helmet Security (CORS + CSP)
+  // 🛡️ Helmet Security with CORS-safe defaults
   app.use(
     helmet({
       crossOriginResourcePolicy: { policy: 'cross-origin' },
@@ -25,20 +26,21 @@ async function bootstrap(): Promise<void> {
         directives: {
           defaultSrc: ["'self'"],
           styleSrc: ["'self'", "'unsafe-inline'"],
-          scriptSrc: ["'self'"],
+          scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
           imgSrc: ["'self'", 'data:', 'blob:', 'https:'],
           fontSrc: ["'self'", 'data:'],
-          connectSrc: ["'self'", 'https:'],
+          connectSrc: ["'self'", 'https:', 'wss:'],
           frameSrc: ["'self'"],
         },
       },
     }),
   );
 
-  // 🌐 Enable CORS
+  // 🌐 CORS Configuration
   const corsOrigins = [
-    configService.get('CORS_ORIGIN', 'https://treasureby.vercel.app'),
     'https://treasureby.vercel.app',
+    'https://www.treasureby.com',
+    'https://treasureby.com',
     'http://localhost:4200',
     'http://localhost:3000',
   ];
@@ -46,7 +48,7 @@ async function bootstrap(): Promise<void> {
   app.enableCors({
     origin: corsOrigins,
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: [
       'Content-Type',
       'Authorization',
@@ -59,7 +61,7 @@ async function bootstrap(): Promise<void> {
     maxAge: 3600,
   });
 
-  // 🧹 Global Pipes
+  // 🧹 Global Validation Pipes
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -72,19 +74,12 @@ async function bootstrap(): Promise<void> {
   // ⚠️ Global Exception Filter
   app.useGlobalFilters(new HttpExceptionFilter());
 
-  // 📘 Swagger Docs
+  // 📘 Swagger Docs Setup
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Treasureby API')
     .setDescription('REST API for Treasureby - Digital Asset Marketplace Platform')
     .setVersion('1.0')
-    .addBearerAuth(
-      {
-        type: 'http',
-        scheme: 'bearer',
-        bearerFormat: 'JWT',
-      },
-      'JWT',
-    )
+    .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }, 'JWT')
     .addTag('Authentication')
     .addTag('Users')
     .build();
@@ -92,17 +87,18 @@ async function bootstrap(): Promise<void> {
   const document = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup(`${apiPrefix}/docs`, app, document);
 
-  // ⚙️ Port and Host (for Fly.io)
-  const port = configService.get<number>('PORT', 8080);
-  const host = process.env.FLY_APP_NAME ? '0.0.0.0' : 'localhost';
+  // ⚙️ Fly.io & Localhost Port + Host Setup
+  const port: number = Number(process.env.PORT) || Number(configService.get('PORT')) || 8080;
+  const host: string = process.env.FLY_APP_NAME ? '0.0.0.0' : 'localhost';
 
   await app.listen(port, host);
 
-  // 🖥️ Logs
-  console.log(`🚀 Treasureby API Server running on http://${host}:${port}/${apiPrefix}`);
-  console.log(`📚 Swagger Docs available at http://${host}:${port}/${apiPrefix}/docs`);
+  // 🖥️ Server Logs
+  const serverUrl = `http://${host}:${port}/${apiPrefix}`;
+  console.log(`🚀 Treasureby API Server running on ${serverUrl}`);
+  console.log(`📚 Swagger Docs available at ${serverUrl}/docs`);
   console.log(`🔐 CORS enabled for: ${corsOrigins.join(', ')}`);
-  console.log(`🌍 Environment: ${process.env.NODE_ENV}`);
+  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
 }
 
 bootstrap();
