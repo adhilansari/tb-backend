@@ -32,14 +32,37 @@ export class AssetsService {
       fileKey = fileUpload.key; // Store the key, not the URL
     }
 
+    // Debug: Log incoming DTO values
+    console.log('📥 Creating asset - Incoming DTO values:', {
+      isFree: createAssetDto.isFree,
+      price: createAssetDto.price,
+      currency: createAssetDto.currency,
+      discount: createAssetDto.discount,
+      type: typeof createAssetDto.isFree,
+    });
+
+    // Explicitly extract and set price/isFree to avoid defaults
+    const { isFree, price, discount, ...restDto } = createAssetDto;
+
+    const assetData = {
+      ...restDto,
+      isFree, // Explicit assignment
+      price: isFree ? 0 : price, // If free, set price to 0
+      discount: isFree ? undefined : discount, // If free, remove discount
+      creatorId: userId,
+      thumbnailUrl: thumbnailUpload.key, // Store key instead of URL
+      fileUrl: fileKey,
+      fileSize: assetFile ? `${(assetFile.size / 1024 / 1024).toFixed(2)} MB` : undefined,
+    };
+
+    console.log('💾 Creating asset with data:', {
+      isFree: assetData.isFree,
+      price: assetData.price,
+      discount: assetData.discount,
+    });
+
     const asset = await this.prisma.asset.create({
-      data: {
-        ...createAssetDto,
-        creatorId: userId,
-        thumbnailUrl: thumbnailUpload.key, // Store key instead of URL
-        fileUrl: fileKey,
-        fileSize: assetFile ? `${(assetFile.size / 1024 / 1024).toFixed(2)} MB` : undefined,
-      },
+      data: assetData,
       include: {
         creator: {
           select: {
@@ -454,17 +477,23 @@ export class AssetsService {
       ? await this.storage.getPresignedUrl(asset.thumbnailUrl, 3600)
       : null;
 
+    // Transform fileUrl from storage key to presigned URL
+    const fileUrl = asset.fileUrl ? await this.storage.getPresignedUrl(asset.fileUrl, 3600) : null;
+
     // Transform creator's avatar URL if it exists
-    const creator = asset.creator ? {
-      ...asset.creator,
-      avatarUrl: asset.creator.avatarUrl
-        ? await this.storage.getPresignedUrl(asset.creator.avatarUrl, 3600)
-        : null,
-    } : undefined;
+    const creator = asset.creator
+      ? {
+        ...asset.creator,
+        avatarUrl: asset.creator.avatarUrl
+          ? await this.storage.getPresignedUrl(asset.creator.avatarUrl, 3600)
+          : null,
+      }
+      : undefined;
 
     return {
       ...asset,
       thumbnailUrl,
+      fileUrl,
       creator,
     };
   }

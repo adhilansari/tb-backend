@@ -28,10 +28,16 @@ export class CreateAssetDto {
 
   @ApiProperty({ description: 'Is this asset free?' })
   @Transform(({ value }) => {
+    console.log('🔄 Transforming isFree value:', { value, type: typeof value });
     if (typeof value === 'string') {
-      return value === 'true' || value === '1';
+      const lowerValue = value.toLowerCase();
+      const result = lowerValue === 'true' || lowerValue === '1';
+      console.log('📊 isFree transformation result:', result);
+      return result;
     }
-    return Boolean(value);
+    const result = Boolean(value);
+    console.log('📊 isFree transformation result (boolean):', result);
+    return result;
   })
   @IsBoolean()
   isFree!: boolean;
