@@ -50,19 +50,7 @@ export class SearchService {
 
     // Transform thumbnail and avatar URLs to presigned URLs
     const assetsWithPresignedUrls = await Promise.all(
-      assets.map(async (asset) => ({
-        ...asset,
-        thumbnailUrl: asset.thumbnailUrl
-          ? await this.storage.getPresignedUrl(asset.thumbnailUrl, 3600)
-          : null,
-        creator:
-          asset.creator && asset.creator.avatarUrl
-            ? {
-              ...asset.creator,
-              avatarUrl: await this.storage.getPresignedUrl(asset.creator.avatarUrl, 3600),
-            }
-            : asset.creator,
-      }))
+      assets.map(async (asset) => this.transformAssetUrls(asset))
     );
 
     return {
@@ -106,17 +94,46 @@ export class SearchService {
 
     // Transform avatar URLs to presigned URLs
     const creatorsWithPresignedUrls = await Promise.all(
-      creators.map(async (creator) => ({
-        ...creator,
-        avatarUrl: creator.avatarUrl
-          ? await this.storage.getPresignedUrl(creator.avatarUrl, 3600)
-          : null,
-      }))
+      creators.map(async (creator) => this.transformUserUrls(creator))
     );
 
     return {
       data: creatorsWithPresignedUrls,
       meta: { page, limit, total },
+    };
+  }
+
+  /**
+   * Transform asset URLs from storage keys to presigned URLs
+   */
+  private async transformAssetUrls(asset: any) {
+    const thumbnailUrl = asset.thumbnailUrl
+      ? await this.storage.getPresignedUrl(asset.thumbnailUrl, 3600)
+      : null;
+
+    const creator = asset.creator
+      ? {
+        ...asset.creator,
+        avatarUrl: asset.creator.avatarUrl
+          ? await this.storage.getPresignedUrl(asset.creator.avatarUrl, 3600)
+          : null,
+      }
+      : undefined;
+
+    return {
+      ...asset,
+      thumbnailUrl,
+      creator,
+    };
+  }
+
+  /**
+   * Transform user URLs from storage keys to presigned URLs
+   */
+  private async transformUserUrls(user: any) {
+    return {
+      ...user,
+      avatarUrl: user.avatarUrl ? await this.storage.getPresignedUrl(user.avatarUrl, 3600) : null,
     };
   }
 }

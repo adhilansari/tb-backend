@@ -454,9 +454,18 @@ export class AssetsService {
       ? await this.storage.getPresignedUrl(asset.thumbnailUrl, 3600)
       : null;
 
+    // Transform creator's avatar URL if it exists
+    const creator = asset.creator ? {
+      ...asset.creator,
+      avatarUrl: asset.creator.avatarUrl
+        ? await this.storage.getPresignedUrl(asset.creator.avatarUrl, 3600)
+        : null,
+    } : undefined;
+
     return {
       ...asset,
       thumbnailUrl,
+      creator,
     };
   }
 
