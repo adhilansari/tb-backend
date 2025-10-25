@@ -9,13 +9,7 @@ import {
   ParseIntPipe,
   DefaultValuePipe,
 } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiBearerAuth,
-  ApiQuery,
-} from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { TransactionsService } from './transactions.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { VerifyPaymentDto } from './dto/verify-payment.dto';
@@ -24,7 +18,7 @@ import { VerifyPaymentDto } from './dto/verify-payment.dto';
 @ApiBearerAuth()
 @Controller('transactions')
 export class TransactionsController {
-  constructor(private readonly transactionsService: TransactionsService) {}
+  constructor(private readonly transactionsService: TransactionsService) { }
 
   @Post('create-order')
   @ApiOperation({ summary: 'Create Razorpay order for asset purchase' })
@@ -49,7 +43,7 @@ export class TransactionsController {
   async getMyPurchases(
     @Request() req: any,
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
-    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number
   ) {
     return this.transactionsService.getMyPurchases(req.user.id, page, limit);
   }
@@ -61,7 +55,7 @@ export class TransactionsController {
   async getMySales(
     @Request() req: any,
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
-    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number
   ) {
     return this.transactionsService.getMySales(req.user.id, page, limit);
   }

@@ -1,4 +1,3 @@
-// File: src/modules/transactions/transactions.service.ts
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '@/common/database/prisma.service';
 import { StorageService } from '@/common/storage/storage.service';
@@ -15,6 +14,7 @@ export class TransactionsService {
   ) { }
 
   async createOrder(userId: string, createOrderDto: CreateOrderDto) {
+    // Validate asset exists
     const asset = await this.prisma.asset.findUnique({
       where: { id: createOrderDto.assetId },
       include: { creator: true },
@@ -24,15 +24,18 @@ export class TransactionsService {
       throw new NotFoundException('Asset not found');
     }
 
+    // Check if asset is free
     if (asset.isFree) {
-      throw new BadRequestException('This asset is free');
+      throw new BadRequestException('This asset is free and cannot be purchased');
     }
 
+    // Prevent self-purchase
     if (asset.creatorId === userId) {
       throw new BadRequestException('You cannot purchase your own asset');
     }
 
-    const existing = await this.prisma.transaction.findFirst({
+    // Check for existing purchase
+    const existingPurchase = await this.prisma.transaction.findFirst({
       where: {
         buyerId: userId,
         assetId: asset.id,
@@ -40,40 +43,56 @@ export class TransactionsService {
       },
     });
 
-    if (existing) {
+    if (existingPurchase) {
       throw new BadRequestException('You have already purchased this asset');
     }
 
-    const receipt = `order_${Date.now()}_${userId.substring(0, 8)}`;
+    // Validate amount matches asset price
+    if (createOrderDto.amount !== asset.price) {
+      throw new BadRequestException(
+        `Amount mismatch: expected ₹${asset.price}, received ₹${createOrderDto.amount}`
+      );
+    }
 
-    const razorpayOrder = await this.razorpayService.createOrder(
-      createOrderDto.amount,
-      createOrderDto.currency,
-      receipt
-    );
+    // Generate unique receipt
+    const receipt = `txn_${Date.now()}_${userId.substring(0, 8)}`;
 
-    const transaction = await this.prisma.transaction.create({
-      data: {
-        buyerId: userId,
-        sellerId: asset.creatorId,
-        assetId: asset.id,
-        amount: createOrderDto.amount,
-        currency: createOrderDto.currency,
-        paymentMethod: 'RAZORPAY',
-        status: 'PENDING',
+    try {
+      // Create Razorpay order (amount should be in rupees)
+      const razorpayOrder = await this.razorpayService.createOrder(
+        createOrderDto.amount, // Amount in rupees (e.g., 99.99)
+        createOrderDto.currency,
+        receipt
+      );
+
+      // Create transaction record
+      const transaction = await this.prisma.transaction.create({
+        data: {
+          buyerId: userId,
+          sellerId: asset.creatorId,
+          assetId: asset.id,
+          amount: createOrderDto.amount, // Store amount in rupees
+          currency: createOrderDto.currency,
+          paymentMethod: 'RAZORPAY',
+          status: 'PENDING',
+          razorpayOrderId: razorpayOrder.id,
+        },
+      });
+
+      return {
+        transactionId: transaction.id,
         razorpayOrderId: razorpayOrder.id,
-      },
-    });
-
-    return {
-      transactionId: transaction.id,
-      razorpayOrderId: razorpayOrder.id,
-      amount: razorpayOrder.amount,
-      currency: razorpayOrder.currency,
-    };
+        amount: razorpayOrder.amount, // Amount in paise for frontend
+        currency: razorpayOrder.currency,
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error occurred';
+      throw new BadRequestException(`Failed to create payment order: ${message}`);
+    }
   }
 
   async verifyPayment(userId: string, verifyPaymentDto: VerifyPaymentDto) {
+    // Verify Razorpay signature
     const isValid = this.razorpayService.verifyPaymentSignature(
       verifyPaymentDto.razorpayOrderId,
       verifyPaymentDto.razorpayPaymentId,
@@ -81,21 +100,35 @@ export class TransactionsService {
     );
 
     if (!isValid) {
-      throw new BadRequestException('Invalid payment signature');
+      throw new BadRequestException('Invalid payment signature - payment verification failed');
     }
 
+    // Find transaction
     const transaction = await this.prisma.transaction.findFirst({
       where: {
         razorpayOrderId: verifyPaymentDto.razorpayOrderId,
         buyerId: userId,
       },
-      include: { asset: true, seller: true },
+      include: {
+        asset: true,
+        seller: true,
+      },
     });
 
     if (!transaction) {
       throw new NotFoundException('Transaction not found');
     }
 
+    // Prevent double completion
+    if (transaction.status === 'COMPLETED') {
+      return {
+        success: true,
+        message: 'Payment already verified',
+        transactionId: transaction.id,
+      };
+    }
+
+    // Update transaction to completed
     await this.prisma.transaction.update({
       where: { id: transaction.id },
       data: {
@@ -105,10 +138,11 @@ export class TransactionsService {
       },
     });
 
+    // Create notification for seller
     await this.createNotification(transaction.sellerId, {
       type: 'PURCHASE',
-      title: 'New Sale!',
-      message: `Your asset "${transaction.asset.title}" was purchased`,
+      title: 'New Sale! 🎉',
+      message: `Your asset "${transaction.asset.title}" was purchased for ₹${transaction.amount}`,
       fromUserId: userId,
       actionUrl: `/asset/${transaction.assetId}`,
     });
@@ -137,6 +171,7 @@ export class TransactionsService {
               thumbnailUrl: true,
               type: true,
               category: true,
+              price: true,
             },
           },
           seller: {
@@ -161,7 +196,17 @@ export class TransactionsService {
         asset: purchase.asset
           ? {
             ...purchase.asset,
-            thumbnailUrl: await this.storage.getPresignedUrl(purchase.asset.thumbnailUrl, 3600),
+            thumbnailUrl: purchase.asset.thumbnailUrl
+              ? await this.storage.getPresignedUrl(purchase.asset.thumbnailUrl, 3600)
+              : null,
+          }
+          : null,
+        seller: purchase.seller
+          ? {
+            ...purchase.seller,
+            avatarUrl: purchase.seller.avatarUrl
+              ? await this.storage.getPresignedUrl(purchase.seller.avatarUrl, 3600)
+              : null,
           }
           : null,
       }))
@@ -197,6 +242,7 @@ export class TransactionsService {
               thumbnailUrl: true,
               type: true,
               category: true,
+              price: true,
             },
           },
           buyer: {
@@ -221,7 +267,17 @@ export class TransactionsService {
         asset: sale.asset
           ? {
             ...sale.asset,
-            thumbnailUrl: await this.storage.getPresignedUrl(sale.asset.thumbnailUrl, 3600),
+            thumbnailUrl: sale.asset.thumbnailUrl
+              ? await this.storage.getPresignedUrl(sale.asset.thumbnailUrl, 3600)
+              : null,
+          }
+          : null,
+        buyer: sale.buyer
+          ? {
+            ...sale.buyer,
+            avatarUrl: sale.buyer.avatarUrl
+              ? await this.storage.getPresignedUrl(sale.buyer.avatarUrl, 3600)
+              : null,
           }
           : null,
       }))
@@ -268,14 +324,29 @@ export class TransactionsService {
       throw new NotFoundException('Transaction not found');
     }
 
+    // Check access permissions
     if (transaction.buyerId !== userId && transaction.sellerId !== userId) {
       throw new BadRequestException('You do not have access to this transaction');
     }
 
-    // Transform thumbnail URL if asset exists
+    // Transform URLs to presigned URLs
     if (transaction.asset?.thumbnailUrl) {
       transaction.asset.thumbnailUrl = await this.storage.getPresignedUrl(
         transaction.asset.thumbnailUrl,
+        3600
+      );
+    }
+
+    if (transaction.buyer?.avatarUrl) {
+      transaction.buyer.avatarUrl = await this.storage.getPresignedUrl(
+        transaction.buyer.avatarUrl,
+        3600
+      );
+    }
+
+    if (transaction.seller?.avatarUrl) {
+      transaction.seller.avatarUrl = await this.storage.getPresignedUrl(
+        transaction.seller.avatarUrl,
         3600
       );
     }
@@ -284,8 +355,13 @@ export class TransactionsService {
   }
 
   private async createNotification(userId: string, data: any) {
-    await this.prisma.notification.create({
-      data: { userId, ...data },
-    });
+    try {
+      await this.prisma.notification.create({
+        data: { userId, ...data },
+      });
+    } catch (error) {
+      // Log but don't fail the transaction
+      console.error('Failed to create notification:', error);
+    }
   }
 }

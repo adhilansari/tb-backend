@@ -18,6 +18,8 @@ import { UsersModule } from './modules/users/users.module';
 import { AssetsModule } from './modules/assets/assets.module';
 import { TransactionsModule } from './modules/transactions/transactions.module';
 import { CommentsModule } from './modules/comments/comments.module';
+import { LikesModule } from './modules/likes/likes.module';
+import { FollowsModule } from './modules/follows/follows.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { MessagesModule } from './modules/messages/messages.module';
 import { SearchModule } from './modules/search/search.module';
@@ -49,6 +51,8 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
     AssetsModule,
     TransactionsModule,
     CommentsModule,
+    LikesModule,
+    FollowsModule,
     NotificationsModule,
     MessagesModule,
     SearchModule,
