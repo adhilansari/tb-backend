@@ -100,25 +100,30 @@ export class CommentsService {
   }
 
   /**
-   * Transform comment user avatar URL to presigned URL
+   * Transform comment to frontend format with presigned avatar URL
+   * Flattens user data to match frontend IComment interface
    */
   private async transformCommentAvatarUrl(comment: any): Promise<any> {
-    if (!comment.user?.avatarUrl) {
-      return comment;
+    let avatarUrl = null;
+
+    if (comment.user?.avatarUrl) {
+      try {
+        avatarUrl = await this.storage.getPresignedUrl(comment.user.avatarUrl, 3600);
+      } catch (error) {
+        console.error('Failed to transform avatar URL:', error);
+      }
     }
 
-    try {
-      const presignedUrl = await this.storage.getPresignedUrl(comment.user.avatarUrl, 3600);
-      return {
-        ...comment,
-        user: {
-          ...comment.user,
-          avatarUrl: presignedUrl,
-        },
-      };
-    } catch (error) {
-      console.error('Failed to transform avatar URL:', error);
-      return comment;
-    }
+    // Flatten user data to match frontend IComment interface
+    return {
+      id: comment.id,
+      userId: comment.userId,
+      username: comment.user?.username || 'Unknown',
+      userAvatar: avatarUrl,
+      text: comment.text,
+      timestamp: comment.createdAt,
+      likes: comment.likes || 0,
+      replies: comment.replies || [],
+    };
   }
 }

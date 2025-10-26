@@ -1,4 +1,6 @@
-// File: src/modules/assets/assets.service.ts
+// ============================================
+// FILE: src/modules/assets/assets.service.ts
+// ============================================
 import {
   Injectable,
   NotFoundException,
@@ -29,10 +31,9 @@ export class AssetsService {
 
     if (assetFile) {
       const fileUpload = await this.storage.uploadFile(assetFile, 'assets');
-      fileKey = fileUpload.key; // Store the key, not the URL
+      fileKey = fileUpload.key;
     }
 
-    // Debug: Log incoming DTO values
     console.log('📥 Creating asset - Incoming DTO values:', {
       isFree: createAssetDto.isFree,
       price: createAssetDto.price,
@@ -41,16 +42,15 @@ export class AssetsService {
       type: typeof createAssetDto.isFree,
     });
 
-    // Explicitly extract and set price/isFree to avoid defaults
     const { isFree, price, discount, ...restDto } = createAssetDto;
 
     const assetData = {
       ...restDto,
-      isFree, // Explicit assignment
-      price: isFree ? 0 : price, // If free, set price to 0
-      discount: isFree ? undefined : discount, // If free, remove discount
+      isFree,
+      price: isFree ? 0 : price,
+      discount: isFree ? undefined : discount,
       creatorId: userId,
-      thumbnailUrl: thumbnailUpload.key, // Store key instead of URL
+      thumbnailUrl: thumbnailUpload.key,
       fileUrl: fileKey,
       fileSize: assetFile ? `${(assetFile.size / 1024 / 1024).toFixed(2)} MB` : undefined,
     };
@@ -76,7 +76,6 @@ export class AssetsService {
       },
     });
 
-    // Generate presigned URLs for the response
     return this.transformAssetUrls(asset);
   }
 
@@ -160,7 +159,6 @@ export class AssetsService {
       this.prisma.asset.count({ where }),
     ]);
 
-    // Generate presigned URLs for all assets
     const assetsWithPresignedUrls = await Promise.all(
       assets.map(async (asset) => this.transformAssetUrls(asset))
     );
@@ -278,7 +276,13 @@ export class AssetsService {
     return { ...transformedAsset, isLiked };
   }
 
-  async update(id: string, userId: string, updateAssetDto: UpdateAssetDto) {
+  async update(
+    id: string,
+    userId: string,
+    updateAssetDto: UpdateAssetDto,
+    thumbnail?: Express.Multer.File,
+    assetFile?: Express.Multer.File
+  ) {
     const asset = await this.prisma.asset.findUnique({ where: { id } });
 
     if (!asset) {
@@ -289,10 +293,132 @@ export class AssetsService {
       throw new ForbiddenException('You can only update your own assets');
     }
 
-    return this.prisma.asset.update({
-      where: { id },
-      data: updateAssetDto,
+    console.log('📥 [SERVICE] Updating asset - Incoming DTO values:', {
+      isFree: updateAssetDto.isFree,
+      isFreeType: typeof updateAssetDto.isFree,
+      price: updateAssetDto.price,
+      priceType: typeof updateAssetDto.price,
+      currency: updateAssetDto.currency,
+      discount: updateAssetDto.discount,
     });
+
+    // Handle file uploads if provided
+    let thumbnailKey = asset.thumbnailUrl;
+    let fileKey = asset.fileUrl;
+
+    if (thumbnail) {
+      const thumbnailUpload = await this.storage.uploadFile(thumbnail, 'thumbnails');
+      thumbnailKey = thumbnailUpload.key;
+    }
+
+    if (assetFile) {
+      const fileUpload = await this.storage.uploadFile(assetFile, 'assets');
+      fileKey = fileUpload.key;
+    }
+
+    // Build update data
+    const updateData: any = {
+      thumbnailUrl: thumbnailKey,
+      fileUrl: fileKey,
+    };
+
+    // Add basic fields if provided
+    if (updateAssetDto.title !== undefined) {
+      updateData.title = updateAssetDto.title;
+    }
+    if (updateAssetDto.description !== undefined) {
+      updateData.description = updateAssetDto.description;
+    }
+    if (updateAssetDto.type !== undefined) {
+      updateData.type = updateAssetDto.type;
+    }
+    if (updateAssetDto.category !== undefined) {
+      updateData.category = updateAssetDto.category;
+    }
+    if (updateAssetDto.tags !== undefined) {
+      updateData.tags = updateAssetDto.tags;
+    }
+    if (updateAssetDto.version !== undefined) {
+      updateData.version = updateAssetDto.version;
+    }
+    if (updateAssetDto.currency !== undefined) {
+      updateData.currency = updateAssetDto.currency;
+    }
+
+    // Handle isFree and pricing logic - SIMPLIFIED
+    if (updateAssetDto.isFree !== undefined) {
+      updateData.isFree = updateAssetDto.isFree;
+
+      console.log('🔍 [SERVICE] isFree provided:', {
+        value: updateAssetDto.isFree,
+        type: typeof updateAssetDto.isFree,
+      });
+
+      if (updateAssetDto.isFree === true) {
+        // Asset is free - force price to 0 and remove discount
+        updateData.price = 0;
+        updateData.discount = null;
+        console.log('💰 [SERVICE] Asset set to FREE - price forced to 0');
+      } else {
+        // Asset is paid
+        console.log('💰 [SERVICE] Asset set to PAID');
+        if (updateAssetDto.price !== undefined) {
+          updateData.price = updateAssetDto.price;
+          console.log('💰 [SERVICE] Price set to:', updateAssetDto.price);
+        }
+        if (updateAssetDto.discount !== undefined) {
+          updateData.discount = updateAssetDto.discount;
+        }
+      }
+    } else if (updateAssetDto.price !== undefined) {
+      // Only price was updated
+      updateData.price = updateAssetDto.price;
+      if (updateAssetDto.price > 0) {
+        updateData.isFree = false;
+        console.log('💰 [SERVICE] Price > 0, setting isFree to false');
+      } else if (updateAssetDto.price === 0) {
+        updateData.isFree = true;
+        console.log('💰 [SERVICE] Price = 0, setting isFree to true');
+      }
+    }
+
+    if (assetFile) {
+      updateData.fileSize = `${(assetFile.size / 1024 / 1024).toFixed(2)} MB`;
+    }
+
+    console.log('💾 [SERVICE] FINAL - Updating database with:', {
+      isFree: updateData.isFree,
+      isFreeType: typeof updateData.isFree,
+      price: updateData.price,
+      priceType: typeof updateData.price,
+      discount: updateData.discount,
+    });
+
+    const updatedAsset = await this.prisma.asset.update({
+      where: { id },
+      data: updateData,
+      include: {
+        creator: {
+          select: {
+            id: true,
+            username: true,
+            displayName: true,
+            avatarUrl: true,
+            verified: true,
+          },
+        },
+      },
+    });
+
+    console.log('✅ [SERVICE] Asset updated in database:', {
+      id: updatedAsset.id,
+      isFree: updatedAsset.isFree,
+      isFreeType: typeof updatedAsset.isFree,
+      price: updatedAsset.price,
+      priceType: typeof updatedAsset.price,
+    });
+
+    return this.transformAssetUrls(updatedAsset);
   }
 
   async remove(id: string, userId: string) {
@@ -469,18 +595,13 @@ export class AssetsService {
     return { data: assetsWithStats };
   }
 
-  /**
-   * Transform asset URLs from storage keys to presigned URLs
-   */
   private async transformAssetUrls(asset: any) {
     const thumbnailUrl = asset.thumbnailUrl
       ? await this.storage.getPresignedUrl(asset.thumbnailUrl, 3600)
       : null;
 
-    // Transform fileUrl from storage key to presigned URL
     const fileUrl = asset.fileUrl ? await this.storage.getPresignedUrl(asset.fileUrl, 3600) : null;
 
-    // Transform creator's avatar URL if it exists
     const creator = asset.creator
       ? {
         ...asset.creator,

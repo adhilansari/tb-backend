@@ -1,3 +1,6 @@
+// ============================================
+// FILE: src/modules/assets/assets.controller.ts
+// ============================================
 import {
   Controller,
   Get,
@@ -29,7 +32,7 @@ import { Public } from '@/common/decorators/public.decorator';
 @ApiTags('Assets')
 @Controller('assets')
 export class AssetsController {
-  constructor(private readonly assetsService: AssetsService) {}
+  constructor(private readonly assetsService: AssetsService) { }
 
   @Post()
   @ApiBearerAuth()
@@ -38,7 +41,17 @@ export class AssetsController {
   @ApiBody({
     schema: {
       type: 'object',
-      required: ['thumbnail', 'type', 'category', 'title', 'description', 'price', 'isFree', 'currency', 'tags'],
+      required: [
+        'thumbnail',
+        'type',
+        'category',
+        'title',
+        'description',
+        'price',
+        'isFree',
+        'currency',
+        'tags',
+      ],
       properties: {
         thumbnail: { type: 'string', format: 'binary' },
         assetFile: { type: 'string', format: 'binary' },
@@ -59,14 +72,14 @@ export class AssetsController {
     FileFieldsInterceptor([
       { name: 'thumbnail', maxCount: 1 },
       { name: 'assetFile', maxCount: 1 },
-    ]),
+    ])
   )
   async create(
     @Request() req: any,
     @Body() createAssetDto: CreateAssetDto,
-    @UploadedFiles() files: { thumbnail?: Express.Multer.File[]; assetFile?: Express.Multer.File[] },
+    @UploadedFiles() files: { thumbnail?: Express.Multer.File[]; assetFile?: Express.Multer.File[] }
   ) {
-    if (!files.thumbnail || !files.thumbnail[0]) {
+    if (!files.thumbnail?.[0]) {
       throw new Error('Thumbnail is required');
     }
 
@@ -74,7 +87,7 @@ export class AssetsController {
       req.user.id,
       createAssetDto,
       files.thumbnail[0],
-      files.assetFile?.[0],
+      files.assetFile?.[0]
     );
   }
 
@@ -102,10 +115,7 @@ export class AssetsController {
   @Get('my-top-assets')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get my top performing assets (for creators)' })
-  async getMyTopAssets(
-    @Request() req: any,
-    @Query('limit') limit?: number,
-  ) {
+  async getMyTopAssets(@Request() req: any, @Query('limit') limit?: number) {
     return this.assetsService.getMyTopAssets(req.user.id, limit);
   }
 
@@ -122,12 +132,35 @@ export class AssetsController {
   @Put(':id')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update asset' })
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(
+    FileFieldsInterceptor([
+      { name: 'thumbnail', maxCount: 1 },
+      { name: 'assetFile', maxCount: 1 },
+    ])
+  )
   async update(
     @Param('id') id: string,
     @Request() req: any,
     @Body() updateAssetDto: UpdateAssetDto,
+    @UploadedFiles()
+    files?: { thumbnail?: Express.Multer.File[]; assetFile?: Express.Multer.File[] }
   ) {
-    return this.assetsService.update(id, req.user.id, updateAssetDto);
+    console.log('📝 [CONTROLLER] Update Asset - Received DTO:', {
+      isFree: updateAssetDto.isFree,
+      isFreeType: typeof updateAssetDto.isFree,
+      price: updateAssetDto.price,
+      priceType: typeof updateAssetDto.price,
+      rawDTO: JSON.stringify(updateAssetDto),
+    });
+
+    return this.assetsService.update(
+      id,
+      req.user.id,
+      updateAssetDto,
+      files?.thumbnail?.[0],
+      files?.assetFile?.[0]
+    );
   }
 
   @Delete(':id')

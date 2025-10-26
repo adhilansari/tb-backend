@@ -57,7 +57,7 @@ async function bootstrap(): Promise<void> {
       whitelist: true,
       forbidNonWhitelisted: true,
       transform: true,
-      transformOptions: { enableImplicitConversion: true },
+      transformOptions: { enableImplicitConversion: false }, // ✅ FIXED: Prevents string "false" → boolean true
     }),
   );
 
