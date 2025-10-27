@@ -94,22 +94,25 @@ export class AssetsController {
   @Public()
   @Get()
   @ApiOperation({ summary: 'Get all assets with filters and pagination' })
-  async findAll(@Query() filters: AssetFiltersDto) {
-    return this.assetsService.findAll(filters);
+  async findAll(@Query() filters: AssetFiltersDto, @Request() req: any) {
+    const userId = req.user?.id;
+    return this.assetsService.findAll(filters, userId);
   }
 
   @Public()
   @Get('featured')
   @ApiOperation({ summary: 'Get featured assets' })
-  async findFeatured(@Query('limit') limit?: number) {
-    return this.assetsService.findFeatured(limit);
+  async findFeatured(@Query('limit') limit?: number, @Request() req: any) {
+    const userId = req.user?.id;
+    return this.assetsService.findFeatured(limit, userId);
   }
 
   @Public()
   @Get('trending')
   @ApiOperation({ summary: 'Get trending assets' })
-  async findTrending(@Query('limit') limit?: number) {
-    return this.assetsService.findTrending(limit);
+  async findTrending(@Query('limit') limit?: number, @Request() req: any) {
+    const userId = req.user?.id;
+    return this.assetsService.findTrending(limit, userId);
   }
 
   @Get('my-top-assets')

@@ -1,9 +1,13 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@/common/database/prisma.service';
+import { NotificationsService, NotificationType } from '../notifications/notifications.service';
 
 @Injectable()
 export class LikesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationsService: NotificationsService,
+  ) {}
 
   /**
    * Toggle like on an asset (like if not liked, unlike if already liked)
@@ -52,6 +56,37 @@ export class LikesService {
           data: { likes: { increment: 1 } },
         }),
       ]);
+
+      // Send notification to asset creator (only if not liking own asset)
+      if (asset.creatorId !== userId) {
+        // Get user who liked
+        const user = await this.prisma.user.findUnique({
+          where: { id: userId },
+          select: {
+            id: true,
+            username: true,
+            displayName: true,
+            avatarUrl: true,
+          },
+        });
+
+        if (user) {
+          // Create notification for asset creator
+          await this.notificationsService.create({
+            userId: asset.creatorId,
+            type: NotificationType.ASSET_LIKED,
+            title: 'New Like',
+            message: `${user.displayName} liked your "${asset.title}"`,
+            actionUrl: `/asset/${assetId}`,
+            metadata: {
+              assetId,
+              likerId: userId,
+              likerName: user.displayName,
+              likerAvatar: user.avatarUrl,
+            },
+          });
+        }
+      }
 
       return {
         liked: true,

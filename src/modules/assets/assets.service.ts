@@ -79,7 +79,7 @@ export class AssetsService {
     return this.transformAssetUrls(asset);
   }
 
-  async findAll(filters: AssetFiltersDto) {
+  async findAll(filters: AssetFiltersDto, userId?: string) {
     const {
       page = 1,
       limit = 20,
@@ -159,8 +159,27 @@ export class AssetsService {
       this.prisma.asset.count({ where }),
     ]);
 
+    // Get liked asset IDs for the current user if authenticated
+    let likedAssetIds: Set<string> = new Set();
+    if (userId) {
+      const likes = await this.prisma.like.findMany({
+        where: {
+          userId,
+          assetId: { in: assets.map(a => a.id) },
+        },
+        select: { assetId: true },
+      });
+      likedAssetIds = new Set(likes.map(l => l.assetId));
+    }
+
     const assetsWithPresignedUrls = await Promise.all(
-      assets.map(async (asset) => this.transformAssetUrls(asset))
+      assets.map(async (asset) => {
+        const transformed = await this.transformAssetUrls(asset);
+        return {
+          ...transformed,
+          isLiked: likedAssetIds.has(asset.id),
+        };
+      })
     );
 
     return {
@@ -176,7 +195,7 @@ export class AssetsService {
     };
   }
 
-  async findFeatured(limit = 10) {
+  async findFeatured(limit = 10, userId?: string) {
     const assets = await this.prisma.asset.findMany({
       where: { featured: true, deletedAt: null },
       take: limit,
@@ -194,10 +213,31 @@ export class AssetsService {
       },
     });
 
-    return Promise.all(assets.map(async (asset) => this.transformAssetUrls(asset)));
+    // Get liked asset IDs for the current user if authenticated
+    let likedAssetIds: Set<string> = new Set();
+    if (userId) {
+      const likes = await this.prisma.like.findMany({
+        where: {
+          userId,
+          assetId: { in: assets.map(a => a.id) },
+        },
+        select: { assetId: true },
+      });
+      likedAssetIds = new Set(likes.map(l => l.assetId));
+    }
+
+    return Promise.all(
+      assets.map(async (asset) => {
+        const transformed = await this.transformAssetUrls(asset);
+        return {
+          ...transformed,
+          isLiked: likedAssetIds.has(asset.id),
+        };
+      })
+    );
   }
 
-  async findTrending(limit = 10) {
+  async findTrending(limit = 10, userId?: string) {
     const assets = await this.prisma.asset.findMany({
       where: { trending: true, deletedAt: null },
       take: limit,
@@ -215,7 +255,28 @@ export class AssetsService {
       },
     });
 
-    return Promise.all(assets.map(async (asset) => this.transformAssetUrls(asset)));
+    // Get liked asset IDs for the current user if authenticated
+    let likedAssetIds: Set<string> = new Set();
+    if (userId) {
+      const likes = await this.prisma.like.findMany({
+        where: {
+          userId,
+          assetId: { in: assets.map(a => a.id) },
+        },
+        select: { assetId: true },
+      });
+      likedAssetIds = new Set(likes.map(l => l.assetId));
+    }
+
+    return Promise.all(
+      assets.map(async (asset) => {
+        const transformed = await this.transformAssetUrls(asset);
+        return {
+          ...transformed,
+          isLiked: likedAssetIds.has(asset.id),
+        };
+      })
+    );
   }
 
   async findOne(id: string, userId?: string) {

@@ -151,6 +151,14 @@ export class UsersController {
     return this.usersService.unfollowUser(req.user.id, followingId);
   }
 
+  @Get(':id/is-following')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Check if current user is following this user' })
+  @ApiResponse({ status: 200, description: 'Follow status retrieved' })
+  async isFollowing(@Request() req: any, @Param('id') userId: string) {
+    return this.usersService.isFollowing(req.user.id, userId);
+  }
+
   @Public()
   @Get(':id/followers')
   @ApiOperation({ summary: 'Get user followers' })

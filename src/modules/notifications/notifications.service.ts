@@ -1,8 +1,28 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '@/common/database/prisma.service';
+
+export enum NotificationType {
+  ASSET_LIKED = 'ASSET_LIKED',
+  ASSET_PURCHASED = 'ASSET_PURCHASED',
+  ASSET_COMMENTED = 'ASSET_COMMENTED',
+  MENTION = 'MENTION',
+  MILESTONE_REACHED = 'MILESTONE_REACHED',
+  NEW_FOLLOWER = 'NEW_FOLLOWER',
+}
+
+export interface CreateNotificationDto {
+  userId: string;
+  type: NotificationType;
+  title: string;
+  message: string;
+  actionUrl: string;
+  metadata?: any;
+}
 
 @Injectable()
 export class NotificationsService {
+  private readonly logger = new Logger(NotificationsService.name);
+
   constructor(private readonly prisma: PrismaService) {}
 
   async findAll(userId: string, page = 1, limit = 20) {
@@ -39,5 +59,74 @@ export class NotificationsService {
   async delete(id: string, userId: string) {
     await this.prisma.notification.deleteMany({ where: { id, userId } });
     return { message: 'Notification deleted' };
+  }
+
+  /**
+   * Create a new notification and send push notification
+   */
+  async create(data: CreateNotificationDto) {
+    try {
+      // Create in-app notification
+      const notification = await this.prisma.notification.create({
+        data: {
+          userId: data.userId,
+          type: data.type,
+          title: data.title,
+          message: data.message,
+          actionUrl: data.actionUrl,
+          metadata: data.metadata || {},
+          read: false,
+        },
+      });
+
+      // Send push notification (if user has FCM tokens)
+      await this.sendPushNotification(data);
+
+      this.logger.log(`Notification created for user ${data.userId}: ${data.type}`);
+
+      return notification;
+    } catch (error) {
+      this.logger.error(`Failed to create notification: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
+  /**
+   * Send push notification via Firebase Cloud Messaging
+   * TODO: Implement FCM integration
+   */
+  private async sendPushNotification(data: CreateNotificationDto) {
+    try {
+      // Get user's FCM tokens
+      // const tokens = await this.getUserFcmTokens(data.userId);
+
+      // if (tokens.length === 0) {
+      //   this.logger.debug(`No FCM tokens found for user ${data.userId}`);
+      //   return;
+      // }
+
+      // For now, just log that we would send a push notification
+      this.logger.debug(
+        `[PUSH NOTIFICATION] Would send to user ${data.userId}: ${data.title} - ${data.message}`,
+      );
+
+      // TODO: Implement actual FCM sending
+      // const message = {
+      //   notification: {
+      //     title: data.title,
+      //     body: data.message,
+      //   },
+      //   data: {
+      //     type: data.type,
+      //     actionUrl: data.actionUrl,
+      //     ...data.metadata,
+      //   },
+      //   tokens: tokens,
+      // };
+      // await admin.messaging().sendMulticast(message);
+    } catch (error) {
+      this.logger.error(`Failed to send push notification: ${error.message}`);
+      // Don't throw - notification creation should succeed even if push fails
+    }
   }
 }
