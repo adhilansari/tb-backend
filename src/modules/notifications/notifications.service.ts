@@ -1,14 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '@/common/database/prisma.service';
-
-export enum NotificationType {
-  ASSET_LIKED = 'ASSET_LIKED',
-  ASSET_PURCHASED = 'ASSET_PURCHASED',
-  ASSET_COMMENTED = 'ASSET_COMMENTED',
-  MENTION = 'MENTION',
-  MILESTONE_REACHED = 'MILESTONE_REACHED',
-  NEW_FOLLOWER = 'NEW_FOLLOWER',
-}
+import { NotificationType } from '@prisma/client';
 
 export interface CreateNotificationDto {
   userId: string;
@@ -16,8 +8,12 @@ export interface CreateNotificationDto {
   title: string;
   message: string;
   actionUrl: string;
-  metadata?: any;
+  fromUserId?: string;
+  assetId?: string;
 }
+
+// Export Prisma's NotificationType for convenience
+export { NotificationType };
 
 @Injectable()
 export class NotificationsService {
@@ -74,7 +70,8 @@ export class NotificationsService {
           title: data.title,
           message: data.message,
           actionUrl: data.actionUrl,
-          metadata: data.metadata || {},
+          fromUserId: data.fromUserId,
+          assetId: data.assetId,
           read: false,
         },
       });
@@ -85,8 +82,8 @@ export class NotificationsService {
       this.logger.log(`Notification created for user ${data.userId}: ${data.type}`);
 
       return notification;
-    } catch (error) {
-      this.logger.error(`Failed to create notification: ${error.message}`, error.stack);
+    } catch (error: any) {
+      this.logger.error(`Failed to create notification: ${error?.message || 'Unknown error'}`, error?.stack);
       throw error;
     }
   }
@@ -124,8 +121,8 @@ export class NotificationsService {
       //   tokens: tokens,
       // };
       // await admin.messaging().sendMulticast(message);
-    } catch (error) {
-      this.logger.error(`Failed to send push notification: ${error.message}`);
+    } catch (error: any) {
+      this.logger.error(`Failed to send push notification: ${error?.message || 'Unknown error'}`);
       // Don't throw - notification creation should succeed even if push fails
     }
   }

@@ -102,16 +102,16 @@ export class AssetsController {
   @Public()
   @Get('featured')
   @ApiOperation({ summary: 'Get featured assets' })
-  async findFeatured(@Query('limit') limit?: number, @Request() req: any) {
-    const userId = req.user?.id;
+  async findFeatured(@Query('limit') limit?: number, @Request() req?: any) {
+    const userId = req?.user?.id;
     return this.assetsService.findFeatured(limit, userId);
   }
 
   @Public()
   @Get('trending')
   @ApiOperation({ summary: 'Get trending assets' })
-  async findTrending(@Query('limit') limit?: number, @Request() req: any) {
-    const userId = req.user?.id;
+  async findTrending(@Query('limit') limit?: number, @Request() req?: any) {
+    const userId = req?.user?.id;
     return this.assetsService.findTrending(limit, userId);
   }
 

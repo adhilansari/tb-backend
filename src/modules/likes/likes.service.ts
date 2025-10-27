@@ -74,16 +74,12 @@ export class LikesService {
           // Create notification for asset creator
           await this.notificationsService.create({
             userId: asset.creatorId,
-            type: NotificationType.ASSET_LIKED,
+            type: NotificationType.LIKE,
             title: 'New Like',
             message: `${user.displayName} liked your "${asset.title}"`,
             actionUrl: `/asset/${assetId}`,
-            metadata: {
-              assetId,
-              likerId: userId,
-              likerName: user.displayName,
-              likerAvatar: user.avatarUrl,
-            },
+            fromUserId: userId,
+            assetId: assetId,
           });
         }
       }
