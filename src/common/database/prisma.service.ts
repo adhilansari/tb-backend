@@ -1,9 +1,4 @@
-import {
-  Injectable,
-  OnModuleInit,
-  OnModuleDestroy,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 
 /**
@@ -11,9 +6,7 @@ import { PrismaClient } from '@prisma/client';
  * Handles database connection lifecycle and provides Prisma Client instance
  */
 @Injectable()
-export class PrismaService
-  extends PrismaClient
-  implements OnModuleInit, OnModuleDestroy {
+export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(PrismaService.name);
 
   constructor() {
@@ -85,7 +78,7 @@ export class PrismaService
     }
 
     const models = Reflect.ownKeys(this).filter(
-      (key) => typeof key === 'string' && key[0] !== '_' && key !== 'constructor',
+      (key) => typeof key === 'string' && !key.startsWith('_') && key !== 'constructor'
     );
 
     await Promise.all(
@@ -95,7 +88,7 @@ export class PrismaService
           return model.deleteMany();
         }
         return Promise.resolve();
-      }),
+      })
     );
   }
 }

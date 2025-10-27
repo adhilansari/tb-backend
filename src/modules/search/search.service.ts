@@ -8,7 +8,7 @@ export class SearchService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly storage: StorageService
-  ) { }
+  ) {}
 
   async searchAssets(query: string, filters: any, page = 1, limit = 20) {
     const skip = (page - 1) * limit;
@@ -113,11 +113,11 @@ export class SearchService {
 
     const creator = asset.creator
       ? {
-        ...asset.creator,
-        avatarUrl: asset.creator.avatarUrl
-          ? await this.storage.getPresignedUrl(asset.creator.avatarUrl, 3600)
-          : null,
-      }
+          ...asset.creator,
+          avatarUrl: asset.creator.avatarUrl
+            ? await this.storage.getPresignedUrl(asset.creator.avatarUrl, 3600)
+            : null,
+        }
       : undefined;
 
     return {

@@ -18,7 +18,7 @@ export class AssetsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly storage: StorageService
-  ) { }
+  ) {}
 
   async create(
     userId: string,
@@ -268,8 +268,8 @@ export class AssetsService {
 
     const isLiked = userId
       ? !!(await this.prisma.like.findUnique({
-        where: { userId_assetId: { userId, assetId: id } },
-      }))
+          where: { userId_assetId: { userId, assetId: id } },
+        }))
       : false;
 
     const transformedAsset = await this.transformAssetUrls(asset);
@@ -604,11 +604,11 @@ export class AssetsService {
 
     const creator = asset.creator
       ? {
-        ...asset.creator,
-        avatarUrl: asset.creator.avatarUrl
-          ? await this.storage.getPresignedUrl(asset.creator.avatarUrl, 3600)
-          : null,
-      }
+          ...asset.creator,
+          avatarUrl: asset.creator.avatarUrl
+            ? await this.storage.getPresignedUrl(asset.creator.avatarUrl, 3600)
+            : null,
+        }
       : undefined;
 
     return {

@@ -8,7 +8,7 @@ export class ReportsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly storage: StorageService
-  ) { }
+  ) {}
 
   async getOverview(userId: string) {
     const [totalRevenue, totalSales, totalAssets, totalViews, totalDownloads, averageRating] =
@@ -37,9 +37,9 @@ export class ReportsService {
         ...sale,
         asset: sale.asset
           ? {
-            ...sale.asset,
-            thumbnailUrl: await this.storage.getPresignedUrl(sale.asset.thumbnailUrl, 3600),
-          }
+              ...sale.asset,
+              thumbnailUrl: await this.storage.getPresignedUrl(sale.asset.thumbnailUrl, 3600),
+            }
           : null,
       }))
     );

@@ -9,4 +9,4 @@ import { StorageModule } from '@/common/storage/storage.module';
   providers: [SearchService],
   exports: [SearchService],
 })
-export class SearchModule { }
+export class SearchModule {}

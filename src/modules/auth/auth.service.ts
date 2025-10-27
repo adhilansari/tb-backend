@@ -16,7 +16,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly storage: StorageService
-  ) { }
+  ) {}
 
   /**
    * Register new user

@@ -33,7 +33,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
 
   constructor(
     private readonly jwtService: JwtService,
-    private readonly configService: ConfigService,
+    private readonly configService: ConfigService
   ) {}
 
   /**
@@ -42,7 +42,8 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
   async handleConnection(client: Socket) {
     try {
       // Extract token from handshake
-      const token = client.handshake.auth.token || client.handshake.headers.authorization?.split(' ')[1];
+      const token =
+        client.handshake.auth.token || client.handshake.headers.authorization?.split(' ')[1];
 
       if (!token) {
         this.logger.warn(`Client ${client.id} connection rejected: No token provided`);
@@ -114,7 +115,10 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
   /**
    * Emit typing indicator
    */
-  emitTyping(receiverId: string, data: { conversationId: string; userId: string; isTyping: boolean }) {
+  emitTyping(
+    receiverId: string,
+    data: { conversationId: string; userId: string; isTyping: boolean }
+  ) {
     this.server.to(`user:${receiverId}`).emit('user-typing', data);
   }
 
@@ -124,7 +128,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
   @SubscribeMessage('typing')
   handleTyping(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { conversationId: string; receiverId: string; isTyping: boolean },
+    @MessageBody() data: { conversationId: string; receiverId: string; isTyping: boolean }
   ) {
     const userId = this.socketUsers.get(client.id);
 
@@ -147,7 +151,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
   @SubscribeMessage('join-conversation')
   handleJoinConversation(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { conversationId: string },
+    @MessageBody() data: { conversationId: string }
   ) {
     const userId = this.socketUsers.get(client.id);
 
@@ -167,7 +171,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
   @SubscribeMessage('leave-conversation')
   handleLeaveConversation(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { conversationId: string },
+    @MessageBody() data: { conversationId: string }
   ) {
     const userId = this.socketUsers.get(client.id);
 

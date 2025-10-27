@@ -22,9 +22,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const request = ctx.getRequest<Request>();
 
     const status =
-      exception instanceof HttpException
-        ? exception.getStatus()
-        : HttpStatus.INTERNAL_SERVER_ERROR;
+      exception instanceof HttpException ? exception.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR;
 
     const exceptionResponse =
       exception instanceof HttpException
@@ -51,12 +49,10 @@ export class HttpExceptionFilter implements ExceptionFilter {
     if (status >= 500) {
       this.logger.error(
         `${request.method} ${request.url} - ${status}`,
-        exception instanceof Error ? exception.stack : JSON.stringify(exception),
+        exception instanceof Error ? exception.stack : JSON.stringify(exception)
       );
     } else {
-      this.logger.warn(
-        `${request.method} ${request.url} - ${status}: ${JSON.stringify(message)}`,
-      );
+      this.logger.warn(`${request.method} ${request.url} - ${status}: ${JSON.stringify(message)}`);
     }
 
     response.status(status).json(errorResponse);

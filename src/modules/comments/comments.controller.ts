@@ -10,13 +10,7 @@ import {
   ParseIntPipe,
   DefaultValuePipe,
 } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiBearerAuth,
-  ApiQuery,
-} from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { CommentsService } from './comments.service';
 import { CreateCommentDto } from './dto/create-comment.dto';
 
@@ -34,7 +28,7 @@ export class CommentsController {
       req.user.id,
       createCommentDto.assetId,
       createCommentDto.text,
-      createCommentDto.parentId,
+      createCommentDto.parentId
     );
   }
 
@@ -45,7 +39,7 @@ export class CommentsController {
   async getAssetComments(
     @Param('assetId') assetId: string,
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
-    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number
   ) {
     return this.commentsService.findByAsset(assetId, page, limit);
   }

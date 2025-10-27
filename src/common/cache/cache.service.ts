@@ -18,7 +18,8 @@ export class CacheService implements OnModuleInit {
 
     // Check if Redis is configured
     const redisHost = this.configService.get('redis.host');
-    this.isEnabled = !!redisHost && redisHost !== 'localhost' || process.env.REDIS_ENABLED === 'true';
+    this.isEnabled =
+      (!!redisHost && redisHost !== 'localhost') || process.env.REDIS_ENABLED === 'true';
   }
 
   async onModuleInit(): Promise<void> {

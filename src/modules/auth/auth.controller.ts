@@ -8,12 +8,7 @@ import {
   Get,
   Request,
 } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiBearerAuth,
-} from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { Public } from '@/common/decorators/public.decorator';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';

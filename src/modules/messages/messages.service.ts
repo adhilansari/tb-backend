@@ -1,4 +1,11 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException, forwardRef, Inject } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ForbiddenException,
+  forwardRef,
+  Inject,
+} from '@nestjs/common';
 import { PrismaService } from '@/common/database/prisma.service';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { MessagesGateway } from './messages.gateway';
@@ -8,8 +15,8 @@ export class MessagesService {
   constructor(
     private readonly prisma: PrismaService,
     @Inject(forwardRef(() => MessagesGateway))
-    private readonly messagesGateway: MessagesGateway,
-  ) { }
+    private readonly messagesGateway: MessagesGateway
+  ) {}
 
   /**
    * Get or create conversation between two users
@@ -107,16 +114,13 @@ export class MessagesService {
   /**
    * Get all conversations for a user
    */
-  async getUserConversations(userId: string, page: number = 1, limit: number = 20) {
+  async getUserConversations(userId: string, page = 1, limit = 20) {
     const skip = (page - 1) * limit;
 
     const [conversations, total] = await Promise.all([
       this.prisma.conversation.findMany({
         where: {
-          OR: [
-            { participant1Id: userId },
-            { participant2Id: userId },
-          ],
+          OR: [{ participant1Id: userId }, { participant2Id: userId }],
         },
         include: {
           participant1: {
@@ -146,10 +150,7 @@ export class MessagesService {
       }),
       this.prisma.conversation.count({
         where: {
-          OR: [
-            { participant1Id: userId },
-            { participant2Id: userId },
-          ],
+          OR: [{ participant1Id: userId }, { participant2Id: userId }],
         },
       }),
     ]);
@@ -234,9 +235,10 @@ export class MessagesService {
     const conversation = await this.getConversation(conversationId, senderId);
 
     // Determine receiver
-    const receiverId = conversation.participant1Id === senderId
-      ? conversation.participant2Id
-      : conversation.participant1Id;
+    const receiverId =
+      conversation.participant1Id === senderId
+        ? conversation.participant2Id
+        : conversation.participant1Id;
 
     // Create message
     const message = await this.prisma.message.create({
@@ -287,7 +289,7 @@ export class MessagesService {
   /**
    * Get messages in a conversation
    */
-  async getMessages(conversationId: string, userId: string, page: number = 1, limit: number = 50) {
+  async getMessages(conversationId: string, userId: string, page = 1, limit = 50) {
     // Verify user is participant
     await this.getConversation(conversationId, userId);
 
@@ -382,7 +384,11 @@ export class MessagesService {
   /**
    * Delete a message
    */
-  async deleteMessage(messageId: string, userId: string, deleteFor: 'sender' | 'receiver' | 'both' = 'sender') {
+  async deleteMessage(
+    messageId: string,
+    userId: string,
+    deleteFor: 'sender' | 'receiver' | 'both' = 'sender'
+  ) {
     const message = await this.prisma.message.findUnique({
       where: { id: messageId },
       include: {
@@ -395,7 +401,7 @@ export class MessagesService {
     }
 
     // Check if user is participant
-    const conversation = message.conversation;
+    const { conversation } = message;
     if (conversation.participant1Id !== userId && conversation.participant2Id !== userId) {
       throw new ForbiddenException('You cannot delete this message');
     }
@@ -457,10 +463,7 @@ export class MessagesService {
   async getUnreadCount(userId: string): Promise<number> {
     const conversations = await this.prisma.conversation.findMany({
       where: {
-        OR: [
-          { participant1Id: userId },
-          { participant2Id: userId },
-        ],
+        OR: [{ participant1Id: userId }, { participant2Id: userId }],
       },
       select: {
         participant1Id: true,
@@ -488,7 +491,11 @@ export class MessagesService {
   /**
    * Create message notification
    */
-  private async createMessageNotification(receiverId: string, senderId: string, conversationId: string) {
+  private async createMessageNotification(
+    receiverId: string,
+    senderId: string,
+    conversationId: string
+  ) {
     const sender = await this.prisma.user.findUnique({
       where: { id: senderId },
       select: { displayName: true },

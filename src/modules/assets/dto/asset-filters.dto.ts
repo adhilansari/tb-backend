@@ -54,7 +54,10 @@ export class AssetFiltersDto {
   @Min(0)
   maxPrice?: number;
 
-  @ApiPropertyOptional({ description: 'Sort by', enum: ['recent', 'popular', 'price-low', 'price-high', 'rating'] })
+  @ApiPropertyOptional({
+    description: 'Sort by',
+    enum: ['recent', 'popular', 'price-low', 'price-high', 'rating'],
+  })
   @IsOptional()
   @IsString()
   sortBy?: string = 'recent';

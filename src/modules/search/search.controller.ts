@@ -1,15 +1,5 @@
-import {
-  Controller,
-  Get,
-  Query,
-  ParseIntPipe,
-  DefaultValuePipe,
-} from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiQuery,
-} from '@nestjs/swagger';
+import { Controller, Get, Query, ParseIntPipe, DefaultValuePipe } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { Public } from '@/common/decorators/public.decorator';
 import { SearchService } from './search.service';
 import { SearchFiltersDto } from './dto/search-filters.dto';
@@ -29,7 +19,7 @@ export class SearchController {
     @Query('query') query: string,
     @Query() filters: SearchFiltersDto,
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
-    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number
   ) {
     return this.searchService.searchAssets(query, filters, page, limit);
   }
@@ -41,9 +31,9 @@ export class SearchController {
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   async searchCreators(
-    @Query('query') query: string = '',
+    @Query('query') query = '',
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
-    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number
   ) {
     return this.searchService.searchCreators(query, page, limit);
   }

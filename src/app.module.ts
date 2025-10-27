@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD, APP_FILTER } from '@nestjs/core';
 import { AppController } from './app.controller';
@@ -26,6 +27,8 @@ import { SearchModule } from './modules/search/search.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { FilesModule } from './modules/files/files.module';
+import { PaymentsModule } from './modules/payments/payments.module';
+import { RefundsModule } from './modules/refunds/refunds.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
@@ -37,6 +40,7 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
       load: [databaseConfig, jwtConfig, redisConfig, storageConfig],
       envFilePath: ['.env.development', '.env'],
     }),
+    ScheduleModule.forRoot(),
     ThrottlerModule.forRoot([
       {
         ttl: parseInt(process.env.RATE_LIMIT_TTL || '60', 10) * 1000,
@@ -59,6 +63,8 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
     ReportsModule,
     AdminModule,
     FilesModule,
+    PaymentsModule,
+    RefundsModule,
   ],
   controllers: [AppController],
   providers: [

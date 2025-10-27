@@ -11,7 +11,7 @@ export class TransactionsService {
     private readonly prisma: PrismaService,
     private readonly razorpayService: RazorpayService,
     private readonly storage: StorageService
-  ) { }
+  ) {}
 
   async createOrder(userId: string, createOrderDto: CreateOrderDto) {
     // Validate asset exists
@@ -195,19 +195,19 @@ export class TransactionsService {
         ...purchase,
         asset: purchase.asset
           ? {
-            ...purchase.asset,
-            thumbnailUrl: purchase.asset.thumbnailUrl
-              ? await this.storage.getPresignedUrl(purchase.asset.thumbnailUrl, 3600)
-              : null,
-          }
+              ...purchase.asset,
+              thumbnailUrl: purchase.asset.thumbnailUrl
+                ? await this.storage.getPresignedUrl(purchase.asset.thumbnailUrl, 3600)
+                : null,
+            }
           : null,
         seller: purchase.seller
           ? {
-            ...purchase.seller,
-            avatarUrl: purchase.seller.avatarUrl
-              ? await this.storage.getPresignedUrl(purchase.seller.avatarUrl, 3600)
-              : null,
-          }
+              ...purchase.seller,
+              avatarUrl: purchase.seller.avatarUrl
+                ? await this.storage.getPresignedUrl(purchase.seller.avatarUrl, 3600)
+                : null,
+            }
           : null,
       }))
     );
@@ -266,19 +266,19 @@ export class TransactionsService {
         ...sale,
         asset: sale.asset
           ? {
-            ...sale.asset,
-            thumbnailUrl: sale.asset.thumbnailUrl
-              ? await this.storage.getPresignedUrl(sale.asset.thumbnailUrl, 3600)
-              : null,
-          }
+              ...sale.asset,
+              thumbnailUrl: sale.asset.thumbnailUrl
+                ? await this.storage.getPresignedUrl(sale.asset.thumbnailUrl, 3600)
+                : null,
+            }
           : null,
         buyer: sale.buyer
           ? {
-            ...sale.buyer,
-            avatarUrl: sale.buyer.avatarUrl
-              ? await this.storage.getPresignedUrl(sale.buyer.avatarUrl, 3600)
-              : null,
-          }
+              ...sale.buyer,
+              avatarUrl: sale.buyer.avatarUrl
+                ? await this.storage.getPresignedUrl(sale.buyer.avatarUrl, 3600)
+                : null,
+            }
           : null,
       }))
     );

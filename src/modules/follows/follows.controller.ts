@@ -9,13 +9,7 @@ import {
   ParseIntPipe,
   DefaultValuePipe,
 } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiBearerAuth,
-  ApiQuery,
-} from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { FollowsService } from './follows.service';
 import { ToggleFollowDto } from './dto/toggle-follow.dto';
 
@@ -28,23 +22,14 @@ export class FollowsController {
   @Post('toggle')
   @ApiOperation({ summary: 'Toggle follow on a user' })
   @ApiResponse({ status: 200, description: 'Follow toggled successfully' })
-  async toggleFollow(
-    @Request() req: any,
-    @Body() toggleFollowDto: ToggleFollowDto,
-  ) {
-    return this.followsService.toggleFollow(
-      req.user.id,
-      toggleFollowDto.targetUserId,
-    );
+  async toggleFollow(@Request() req: any, @Body() toggleFollowDto: ToggleFollowDto) {
+    return this.followsService.toggleFollow(req.user.id, toggleFollowDto.targetUserId);
   }
 
   @Get('status/:userId')
   @ApiOperation({ summary: 'Check if current user is following a user' })
   @ApiResponse({ status: 200, description: 'Follow status returned' })
-  async checkFollowStatus(
-    @Request() req: any,
-    @Param('userId') userId: string,
-  ) {
+  async checkFollowStatus(@Request() req: any, @Param('userId') userId: string) {
     return this.followsService.checkFollowStatus(req.user.id, userId);
   }
 
@@ -55,7 +40,7 @@ export class FollowsController {
   async getFollowers(
     @Param('userId') userId: string,
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
-    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number
   ) {
     return this.followsService.getFollowers(userId, page, limit);
   }
@@ -67,7 +52,7 @@ export class FollowsController {
   async getFollowing(
     @Param('userId') userId: string,
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
-    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number
   ) {
     return this.followsService.getFollowing(userId, page, limit);
   }

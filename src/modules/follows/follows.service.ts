@@ -1,8 +1,4 @@
-import {
-  Injectable,
-  NotFoundException,
-  BadRequestException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '@/common/database/prisma.service';
 import { StorageService } from '@/common/storage/storage.service';
 
@@ -10,7 +6,7 @@ import { StorageService } from '@/common/storage/storage.service';
 export class FollowsService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly storage: StorageService,
+    private readonly storage: StorageService
   ) {}
 
   /**
@@ -114,19 +110,16 @@ export class FollowsService {
     // Transform avatar URLs
     const followersWithPresignedUrls = await Promise.all(
       follows.map(async (follow) => {
-        const follower = follow.follower;
+        const { follower } = follow;
         if (follower.avatarUrl) {
           try {
-            follower.avatarUrl = await this.storage.getPresignedUrl(
-              follower.avatarUrl,
-              3600,
-            );
+            follower.avatarUrl = await this.storage.getPresignedUrl(follower.avatarUrl, 3600);
           } catch (error) {
             console.error('Failed to transform avatar URL:', error);
           }
         }
         return follower;
-      }),
+      })
     );
 
     return {
@@ -166,19 +159,16 @@ export class FollowsService {
     // Transform avatar URLs
     const followingWithPresignedUrls = await Promise.all(
       follows.map(async (follow) => {
-        const following = follow.following;
+        const { following } = follow;
         if (following.avatarUrl) {
           try {
-            following.avatarUrl = await this.storage.getPresignedUrl(
-              following.avatarUrl,
-              3600,
-            );
+            following.avatarUrl = await this.storage.getPresignedUrl(following.avatarUrl, 3600);
           } catch (error) {
             console.error('Failed to transform avatar URL:', error);
           }
         }
         return following;
-      }),
+      })
     );
 
     return {

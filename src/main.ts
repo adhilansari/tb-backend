@@ -23,7 +23,7 @@ async function bootstrap(): Promise<void> {
       crossOriginResourcePolicy: { policy: 'cross-origin' },
       crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' },
       contentSecurityPolicy: false, // disable CSP for APIs
-    }),
+    })
   );
 
   // 🌐 CORS Configuration
@@ -58,7 +58,7 @@ async function bootstrap(): Promise<void> {
       forbidNonWhitelisted: true,
       transform: true,
       transformOptions: { enableImplicitConversion: false }, // ✅ FIXED: Prevents string "false" → boolean true
-    }),
+    })
   );
 
   // ⚠️ Global Exception Filter
@@ -69,10 +69,7 @@ async function bootstrap(): Promise<void> {
     .setTitle('Treasureby API')
     .setDescription('REST API for Treasureby - Digital Asset Marketplace Platform')
     .setVersion('1.0')
-    .addBearerAuth(
-      { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
-      'JWT',
-    )
+    .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }, 'JWT')
     .addTag('Authentication')
     .addTag('Users')
     .addTag('Assets')

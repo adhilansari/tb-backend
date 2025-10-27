@@ -13,4 +13,4 @@ import { StorageModule } from '@/common/storage/storage.module';
   providers: [TransactionsService, RazorpayService],
   exports: [TransactionsService],
 })
-export class TransactionsModule { }
+export class TransactionsModule {}

@@ -73,6 +73,30 @@ enum NotificationType {
   NEW_SALE
 }
 
+enum EscrowStatus {
+  HELD           // Funds held in escrow (7-day period)
+  RELEASED       // Funds released to creator
+  REFUNDED       // Funds refunded to buyer
+  DISPUTED       // Under dispute
+}
+
+enum PayoutStatus {
+  PENDING        // Awaiting escrow release
+  PROCESSING     // Being processed via Razorpay Payouts
+  COMPLETED      // Successfully paid to creator
+  FAILED         // Payout failed
+  CANCELLED      // Cancelled due to refund
+}
+
+enum RefundStatus {
+  PENDING        // Refund requested, awaiting review
+  APPROVED       // Refund approved by admin
+  REJECTED       // Refund rejected
+  PROCESSING     // Being processed via Razorpay
+  COMPLETED      // Refund completed
+  FAILED         // Refund failed
+}
+
 enum ProfileVisibility {
   PUBLIC
   PRIVATE
@@ -121,6 +145,17 @@ model User {
   stripeConnected   Boolean  @default(false)
   razorpayConnected Boolean  @default(false)
 
+  // Creator Payout Settings
+  creatorTermsAccepted       Boolean   @default(false)
+  creatorTermsAcceptedAt     DateTime?
+  razorpayFundAccountId      String?   // Razorpay Fund Account ID
+  bankAccountNumber          String?
+  bankAccountHolderName      String?
+  bankIfscCode               String?
+  upiId                      String?
+  payoutMethod               String?   // 'bank_transfer' or 'upi'
+  payoutMinThreshold         Float     @default(100) // Minimum payout amount
+
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
@@ -138,6 +173,8 @@ model User {
   conversations1    Conversation[] @relation("participant1")
   conversations2    Conversation[] @relation("participant2")
   messagesSent      Message[]
+  payouts           Payout[]       @relation("creatorPayouts")
+  refunds           Refund[]       @relation("buyerRefunds")
 
   @@index([email])
   @@index([username])
@@ -285,19 +322,118 @@ model Transaction {
   paymentMethod PaymentMethod
   status        TransactionStatus @default(PENDING)
 
+  // Commission System (TreasuryBy takes 12%, Creator gets 88%)
+  platformFeePercentage Float @default(12.0)
+  platformFeeAmount     Float @default(0)
+  creatorAmount         Float @default(0)
+
+  // Escrow System (7-day hold before payout)
+  escrowStatus       EscrowStatus @default(HELD)
+  escrowReleaseDate  DateTime?   // Date when funds can be released to creator
+  escrowReleasedAt   DateTime?   // Actual release date
+  isRefundable       Boolean      @default(true)
+  refundDeadline     DateTime?   // Last date for refund (completedAt + 7 days)
+
   razorpayOrderId   String?
   razorpayPaymentId String?
+  razorpayPaymentMethod String?  // UPI, card, netbanking, etc.
   paypalOrderId     String?
   stripePaymentId   String?
 
   createdAt   DateTime  @default(now())
   completedAt DateTime?
 
+  payout  Payout?
+  refunds Refund[]
+
   @@index([buyerId])
   @@index([sellerId])
   @@index([assetId])
   @@index([status])
+  @@index([escrowStatus])
   @@index([createdAt])
+  @@index([escrowReleaseDate])
+}
+
+// Creator Payout Model - Tracks payouts to creators
+model Payout {
+  id String @id @default(uuid())
+
+  creatorId String
+  creator   User   @relation("creatorPayouts", fields: [creatorId], references: [id], onDelete: Cascade)
+
+  transactionId String      @unique
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+
+  // Payout amounts
+  grossAmount       Float // Total sale amount
+  platformFee       Float // 12% platform commission
+  netAmount         Float // Amount paid to creator (88%)
+  currency          Currency @default(USD)
+
+  // Payout status and details
+  status            PayoutStatus @default(PENDING)
+  razorpayPayoutId  String?      // Razorpay Payout ID
+  razorpayFundAccountId String?  // Creator's fund account (bank/UPI)
+
+  // Banking details
+  bankAccountNumber String?
+  bankIfscCode      String?
+  upiId             String?
+  payoutMethod      String?      // bank_transfer, upi, etc.
+
+  // Reconciliation
+  reconciliationReport String?   @db.Text // JSON with sale details
+
+  initiatedAt DateTime?
+  completedAt DateTime?
+  failedAt    DateTime?
+  failureReason String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([creatorId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// Refund Model - Tracks refund requests and processing
+model Refund {
+  id String @id @default(uuid())
+
+  transactionId String
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+
+  buyerId String
+  buyer   User   @relation("buyerRefunds", fields: [buyerId], references: [id], onDelete: Cascade)
+
+  // Refund details
+  amount            Float
+  currency          Currency @default(USD)
+  reason            String   @db.Text
+  status            RefundStatus @default(PENDING)
+
+  // Gateway details
+  razorpayRefundId  String?
+  refundMethod      String?  // Refunded via original payment method
+
+  // Admin review
+  reviewedBy        String?
+  reviewNotes       String?  @db.Text
+
+  requestedAt DateTime @default(now())
+  approvedAt  DateTime?
+  rejectedAt  DateTime?
+  completedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([transactionId])
+  @@index([buyerId])
+  @@index([status])
+  @@index([requestedAt])
 }
 
 model Notification {

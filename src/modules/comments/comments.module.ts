@@ -10,4 +10,4 @@ import { StorageModule } from '@/common/storage/storage.module';
   providers: [CommentsService],
   exports: [CommentsService],
 })
-export class CommentsModule { }
+export class CommentsModule {}

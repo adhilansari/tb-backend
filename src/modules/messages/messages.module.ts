@@ -24,4 +24,4 @@ import { PrismaModule } from '@/common/database/prisma.module';
   providers: [MessagesService, MessagesGateway],
   exports: [MessagesService, MessagesGateway],
 })
-export class MessagesModule { }
+export class MessagesModule {}

@@ -160,7 +160,7 @@ export class StorageService {
    */
   async uploadFile(
     file: Express.Multer.File,
-    folder: string = 'uploads',
+    folder = 'uploads'
   ): Promise<{ key: string; url: string }> {
     this.validateFile(file);
 
@@ -186,17 +186,16 @@ export class StorageService {
       return { key, url };
     } catch (error) {
       this.logger.error(`Failed to upload file: ${error}`);
-      throw new Error(`File upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(
+        `File upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
   }
 
   /**
    * Generate presigned URL for temporary access
    */
-  async getPresignedUrl(
-    key: string,
-    expiresIn: number = 3600,
-  ): Promise<string> {
+  async getPresignedUrl(key: string, expiresIn = 3600): Promise<string> {
     try {
       const command = new GetObjectCommand({
         Bucket: this.bucketName,
@@ -225,7 +224,9 @@ export class StorageService {
       this.logger.log(`File deleted successfully: ${key}`);
     } catch (error) {
       this.logger.error(`Failed to delete file: ${error}`);
-      throw new Error(`File deletion failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(
+        `File deletion failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
   }
 
@@ -253,7 +254,7 @@ export class StorageService {
     // Check file type
     if (!this.allowedFileTypes.includes(file.mimetype)) {
       throw new Error(
-        `Invalid file type: ${file.mimetype}. Please upload a supported file format.`,
+        `Invalid file type: ${file.mimetype}. Please upload a supported file format.`
       );
     }
 
@@ -269,16 +270,16 @@ export class StorageService {
 
     // Check file size
     if (file.size > maxSize) {
-      const maxSizeMB = maxSize >= 1024 * 1024 * 1024
-        ? `${(maxSize / (1024 * 1024 * 1024)).toFixed(1)}GB`
-        : `${(maxSize / (1024 * 1024)).toFixed(0)}MB`;
-      const fileSizeMB = file.size >= 1024 * 1024 * 1024
-        ? `${(file.size / (1024 * 1024 * 1024)).toFixed(2)}GB`
-        : `${(file.size / (1024 * 1024)).toFixed(2)}MB`;
+      const maxSizeMB =
+        maxSize >= 1024 * 1024 * 1024
+          ? `${(maxSize / (1024 * 1024 * 1024)).toFixed(1)}GB`
+          : `${(maxSize / (1024 * 1024)).toFixed(0)}MB`;
+      const fileSizeMB =
+        file.size >= 1024 * 1024 * 1024
+          ? `${(file.size / (1024 * 1024 * 1024)).toFixed(2)}GB`
+          : `${(file.size / (1024 * 1024)).toFixed(2)}MB`;
 
-      throw new Error(
-        `File too large. Maximum size: ${maxSizeMB}, got: ${fileSizeMB}`,
-      );
+      throw new Error(`File too large. Maximum size: ${maxSizeMB}, got: ${fileSizeMB}`);
     }
   }
 

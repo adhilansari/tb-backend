@@ -10,4 +10,4 @@ import { StorageModule } from '@/common/storage/storage.module';
   providers: [ReportsService],
   exports: [ReportsService],
 })
-export class ReportsModule { }
+export class ReportsModule {}

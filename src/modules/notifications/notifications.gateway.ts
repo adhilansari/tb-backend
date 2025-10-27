@@ -30,7 +30,7 @@ export class NotificationsGateway implements OnGatewayConnection, OnGatewayDisco
 
   constructor(
     private readonly jwtService: JwtService,
-    private readonly configService: ConfigService,
+    private readonly configService: ConfigService
   ) {}
 
   /**
@@ -39,7 +39,8 @@ export class NotificationsGateway implements OnGatewayConnection, OnGatewayDisco
   async handleConnection(client: Socket) {
     try {
       // Extract token from handshake
-      const token = client.handshake.auth.token || client.handshake.headers.authorization?.split(' ')[1];
+      const token =
+        client.handshake.auth.token || client.handshake.headers.authorization?.split(' ')[1];
 
       if (!token) {
         this.logger.warn(`Client ${client.id} connection rejected: No token provided`);

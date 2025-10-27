@@ -18,7 +18,7 @@ import { VerifyPaymentDto } from './dto/verify-payment.dto';
 @ApiBearerAuth()
 @Controller('transactions')
 export class TransactionsController {
-  constructor(private readonly transactionsService: TransactionsService) { }
+  constructor(private readonly transactionsService: TransactionsService) {}
 
   @Post('create-order')
   @ApiOperation({ summary: 'Create Razorpay order for asset purchase' })

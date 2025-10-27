@@ -80,10 +80,7 @@ export class UsersController {
   })
   @ApiResponse({ status: 200, description: 'Avatar uploaded successfully' })
   @UseInterceptors(FileInterceptor('avatar'))
-  async uploadAvatar(
-    @Request() req: any,
-    @UploadedFile() file: Express.Multer.File,
-  ) {
+  async uploadAvatar(@Request() req: any, @UploadedFile() file: Express.Multer.File) {
     if (!file) {
       throw new BadRequestException('Avatar file is required');
     }
@@ -115,7 +112,7 @@ export class UsersController {
   @ApiResponse({ status: 400, description: 'Invalid current password' })
   async changePassword(
     @Request() req: any,
-    @Body() body: { currentPassword: string; newPassword: string },
+    @Body() body: { currentPassword: string; newPassword: string }
   ) {
     return this.usersService.changePassword(req.user.id, body.currentPassword, body.newPassword);
   }
@@ -162,7 +159,7 @@ export class UsersController {
   async getFollowers(
     @Param('id') id: string,
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
-    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number
   ) {
     return this.usersService.getFollowers(id, page, limit);
   }
@@ -175,7 +172,7 @@ export class UsersController {
   async getFollowing(
     @Param('id') id: string,
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
-    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number
   ) {
     return this.usersService.getFollowing(id, page, limit);
   }
@@ -188,8 +185,52 @@ export class UsersController {
   async getLikedAssets(
     @Request() req: any,
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
-    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number
   ) {
     return this.usersService.getLikedAssets(req.user.id, page, limit);
+  }
+
+  @Post('me/creator-terms')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Accept creator terms and set up payout method' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['acceptCommission', 'acceptEscrow', 'payoutMethod'],
+      properties: {
+        acceptCommission: { type: 'boolean' },
+        acceptEscrow: { type: 'boolean' },
+        payoutMethod: { type: 'string', enum: ['upi', 'bank_transfer'] },
+        upiId: { type: 'string' },
+        bankAccountHolderName: { type: 'string' },
+        bankAccountNumber: { type: 'string' },
+        bankIfscCode: { type: 'string' },
+      },
+    },
+  })
+  @ApiResponse({ status: 200, description: 'Creator terms accepted successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid data or terms not accepted' })
+  async acceptCreatorTerms(
+    @Request() req: any,
+    @Body()
+    body: {
+      acceptCommission: boolean;
+      acceptEscrow: boolean;
+      payoutMethod: string;
+      upiId?: string;
+      bankAccountHolderName?: string;
+      bankAccountNumber?: string;
+      bankIfscCode?: string;
+    }
+  ) {
+    return this.usersService.acceptCreatorTerms(req.user.id, body);
+  }
+
+  @Get('me/creator-status')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Check if user has accepted creator terms' })
+  @ApiResponse({ status: 200, description: 'Creator status retrieved' })
+  async getCreatorStatus(@Request() req: any) {
+    return this.usersService.getCreatorStatus(req.user.id);
   }
 }

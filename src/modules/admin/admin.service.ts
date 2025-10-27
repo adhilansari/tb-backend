@@ -3,9 +3,9 @@ import { PrismaService } from '@/common/database/prisma.service';
 
 @Injectable()
 export class AdminService {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
-  async getAllUsers(page: number = 1, limit: number = 50) {
+  async getAllUsers(page = 1, limit = 50) {
     const skip = (page - 1) * limit;
     const [users, total] = await Promise.all([
       this.prisma.user.findMany({
@@ -43,7 +43,7 @@ export class AdminService {
     return { message: 'User deleted' };
   }
 
-  async getAllAssets(page: number = 1, limit: number = 50) {
+  async getAllAssets(page = 1, limit = 50) {
     const skip = (page - 1) * limit;
     const [assets, total] = await Promise.all([
       this.prisma.asset.findMany({
@@ -74,22 +74,17 @@ export class AdminService {
   }
 
   async getStats() {
-    const [
-      totalUsers,
-      totalCreators,
-      totalAssets,
-      totalTransactions,
-      totalRevenue,
-    ] = await Promise.all([
-      this.prisma.user.count({ where: { deletedAt: null } }),
-      this.prisma.user.count({ where: { role: 'CREATOR', deletedAt: null } }),
-      this.prisma.asset.count({ where: { deletedAt: null } }),
-      this.prisma.transaction.count({ where: { status: 'COMPLETED' } }),
-      this.prisma.transaction.aggregate({
-        where: { status: 'COMPLETED' },
-        _sum: { amount: true },
-      }),
-    ]);
+    const [totalUsers, totalCreators, totalAssets, totalTransactions, totalRevenue] =
+      await Promise.all([
+        this.prisma.user.count({ where: { deletedAt: null } }),
+        this.prisma.user.count({ where: { role: 'CREATOR', deletedAt: null } }),
+        this.prisma.asset.count({ where: { deletedAt: null } }),
+        this.prisma.transaction.count({ where: { status: 'COMPLETED' } }),
+        this.prisma.transaction.aggregate({
+          where: { status: 'COMPLETED' },
+          _sum: { amount: true },
+        }),
+      ]);
 
     return {
       totalUsers,

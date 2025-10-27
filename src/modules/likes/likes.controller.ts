@@ -9,13 +9,7 @@ import {
   ParseIntPipe,
   DefaultValuePipe,
 } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiBearerAuth,
-  ApiQuery,
-} from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { LikesService } from './likes.service';
 import { ToggleLikeDto } from './dto/toggle-like.dto';
 
@@ -35,10 +29,7 @@ export class LikesController {
   @Get('status/:assetId')
   @ApiOperation({ summary: 'Check if user has liked an asset' })
   @ApiResponse({ status: 200, description: 'Like status returned' })
-  async checkLikeStatus(
-    @Request() req: any,
-    @Param('assetId') assetId: string,
-  ) {
+  async checkLikeStatus(@Request() req: any, @Param('assetId') assetId: string) {
     return this.likesService.checkLikeStatus(req.user.id, assetId);
   }
 
@@ -49,7 +40,7 @@ export class LikesController {
   async getUserLikes(
     @Request() req: any,
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
-    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number
   ) {
     return this.likesService.getUserLikes(req.user.id, page, limit);
   }

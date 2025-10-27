@@ -7,7 +7,7 @@ import { Public } from '@/common/decorators/public.decorator';
 @ApiTags('Files')
 @Controller('files')
 export class FilesController {
-  constructor(private readonly storageService: StorageService) { }
+  constructor(private readonly storageService: StorageService) {}
 
   @Public()
   @Get(':folder/:filename')
@@ -19,7 +19,7 @@ export class FilesController {
   async getFile(
     @Param('folder') folder: string,
     @Param('filename') filename: string,
-    @Res() res: Response,
+    @Res() res: Response
   ) {
     try {
       const key = `${folder}/${filename}`;

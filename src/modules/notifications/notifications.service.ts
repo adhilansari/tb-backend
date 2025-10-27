@@ -5,7 +5,7 @@ import { PrismaService } from '@/common/database/prisma.service';
 export class NotificationsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findAll(userId: string, page: number = 1, limit: number = 20) {
+  async findAll(userId: string, page = 1, limit = 20) {
     const skip = (page - 1) * limit;
     const [notifications, total, unreadCount] = await Promise.all([
       this.prisma.notification.findMany({

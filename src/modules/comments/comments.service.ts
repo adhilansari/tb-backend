@@ -8,7 +8,7 @@ export class CommentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly storage: StorageService
-  ) { }
+  ) {}
 
   async create(userId: string, assetId: string, text: string, parentId?: string) {
     const comment = await this.prisma.comment.create({

@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '@/common/database/prisma.service';
 import { StorageService } from '@/common/storage/storage.service';
+import { RazorpayService } from '@/modules/payments/razorpay.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UpdateSettingsDto } from './dto/update-settings.dto';
 import * as bcrypt from 'bcrypt';
@@ -9,8 +10,9 @@ import * as bcrypt from 'bcrypt';
 export class UsersService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly storage: StorageService
-  ) { }
+    private readonly storage: StorageService,
+    private readonly razorpay: RazorpayService
+  ) {}
 
   async findByUsername(username: string) {
     const user = await this.prisma.user.findUnique({
@@ -417,9 +419,9 @@ export class UsersService {
         creator:
           like.asset.creator && like.asset.creator.avatarUrl
             ? {
-              ...like.asset.creator,
-              avatarUrl: await this.storage.getPresignedUrl(like.asset.creator.avatarUrl, 3600),
-            }
+                ...like.asset.creator,
+                avatarUrl: await this.storage.getPresignedUrl(like.asset.creator.avatarUrl, 3600),
+              }
             : like.asset.creator,
       }))
     );
@@ -435,5 +437,201 @@ export class UsersService {
         hasPrevious: page > 1,
       },
     };
+  }
+
+  /**
+   * Accept creator terms and set up payout method
+   */
+  async acceptCreatorTerms(
+    userId: string,
+    data: {
+      acceptCommission: boolean;
+      acceptEscrow: boolean;
+      payoutMethod: string;
+      upiId?: string;
+      bankAccountHolderName?: string;
+      bankAccountNumber?: string;
+      bankIfscCode?: string;
+    }
+  ) {
+    // Validate that terms are accepted
+    if (!data.acceptCommission || !data.acceptEscrow) {
+      throw new BadRequestException('You must accept both the commission and escrow terms');
+    }
+
+    // Validate payout method data
+    if (data.payoutMethod === 'upi') {
+      if (!data.upiId) {
+        throw new BadRequestException('UPI ID is required for UPI payout method');
+      }
+      // Validate UPI ID format
+      if (!/^[\w.-]+@[\w.-]+$/.test(data.upiId)) {
+        throw new BadRequestException('Invalid UPI ID format');
+      }
+    } else if (data.payoutMethod === 'bank_transfer') {
+      if (!data.bankAccountHolderName || !data.bankAccountNumber || !data.bankIfscCode) {
+        throw new BadRequestException('Bank account details are required for bank transfer');
+      }
+      // Validate IFSC code format
+      if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(data.bankIfscCode)) {
+        throw new BadRequestException('Invalid IFSC code format');
+      }
+    } else {
+      throw new BadRequestException('Invalid payout method');
+    }
+
+    // Get user details for fund account creation
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        displayName: true,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    // Create Razorpay Fund Account (if Razorpay is configured)
+    let fundAccountId: string | null = null;
+
+    if (this.razorpay.isConfigured()) {
+      try {
+        const fundAccountData = await this.razorpay.createFundAccount({
+          contact: {
+            name: user.displayName || user.email,
+            email: user.email,
+            type: 'customer',
+          },
+          account_type: data.payoutMethod === 'upi' ? 'vpa' : 'bank_account',
+          vpa: data.payoutMethod === 'upi' ? { address: data.upiId! } : undefined,
+          bank_account:
+            data.payoutMethod === 'bank_transfer'
+              ? {
+                  name: data.bankAccountHolderName!,
+                  ifsc: data.bankIfscCode!.toUpperCase(),
+                  account_number: data.bankAccountNumber!,
+                }
+              : undefined,
+        });
+
+        fundAccountId = fundAccountData.fundAccountId;
+
+        console.log('✅ Razorpay fund account created:', {
+          userId,
+          fundAccountId,
+          accountType: data.payoutMethod,
+        });
+      } catch (error) {
+        console.error('❌ Failed to create Razorpay fund account:', error);
+        throw new BadRequestException(
+          'Failed to set up payout account. Please check your banking details and try again.'
+        );
+      }
+    } else {
+      console.warn('⚠️ Razorpay not configured - skipping fund account creation');
+    }
+
+    // Update user with creator terms acceptance and payout details
+    const updatedUser = await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        creatorTermsAccepted: true,
+        creatorTermsAcceptedAt: new Date(),
+        payoutMethod: data.payoutMethod,
+        upiId: data.payoutMethod === 'upi' ? data.upiId : null,
+        bankAccountHolderName:
+          data.payoutMethod === 'bank_transfer' ? data.bankAccountHolderName : null,
+        bankAccountNumber: data.payoutMethod === 'bank_transfer' ? data.bankAccountNumber : null,
+        bankIfscCode:
+          data.payoutMethod === 'bank_transfer' ? data.bankIfscCode?.toUpperCase() : null,
+        razorpayFundAccountId: fundAccountId,
+      },
+      select: {
+        id: true,
+        email: true,
+        username: true,
+        displayName: true,
+        creatorTermsAccepted: true,
+        creatorTermsAcceptedAt: true,
+        payoutMethod: true,
+      },
+    });
+
+    console.log('✅ Creator terms accepted:', {
+      userId,
+      payoutMethod: data.payoutMethod,
+      timestamp: updatedUser.creatorTermsAcceptedAt,
+    });
+
+    return {
+      success: true,
+      message: 'Creator terms accepted successfully. You can now receive payouts!',
+      user: updatedUser,
+    };
+  }
+
+  /**
+   * Get creator status (whether they've accepted terms)
+   */
+  async getCreatorStatus(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        creatorTermsAccepted: true,
+        creatorTermsAcceptedAt: true,
+        payoutMethod: true,
+        upiId: true,
+        bankAccountHolderName: true,
+        bankAccountNumber: true,
+        bankIfscCode: true,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    // Mask sensitive banking details
+    return {
+      creatorTermsAccepted: user.creatorTermsAccepted,
+      creatorTermsAcceptedAt: user.creatorTermsAcceptedAt,
+      payoutMethod: user.payoutMethod,
+      hasPayoutDetails: !!(user.upiId || (user.bankAccountNumber && user.bankIfscCode)),
+      payoutDetails: user.creatorTermsAccepted
+        ? {
+            upiId: user.upiId ? this.maskUpiId(user.upiId) : null,
+            bankAccountNumber: user.bankAccountNumber
+              ? this.maskBankAccount(user.bankAccountNumber)
+              : null,
+            bankAccountHolderName: user.bankAccountHolderName,
+            bankIfscCode: user.bankIfscCode,
+          }
+        : null,
+    };
+  }
+
+  /**
+   * Mask UPI ID for security
+   */
+  private maskUpiId(upiId: string): string {
+    const [name, provider] = upiId.split('@');
+    if (name.length <= 4) {
+      return `${name}@${provider}`;
+    }
+    return `${name.substring(0, 2)}***${name.substring(name.length - 2)}@${provider}`;
+  }
+
+  /**
+   * Mask bank account number for security
+   */
+  private maskBankAccount(accountNumber: string): string {
+    if (accountNumber.length <= 4) {
+      return accountNumber;
+    }
+    return `***${accountNumber.substring(accountNumber.length - 4)}`;
   }
 }

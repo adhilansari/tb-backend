@@ -8,13 +8,7 @@ import {
   ParseIntPipe,
   DefaultValuePipe,
 } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiBearerAuth,
-  ApiQuery,
-} from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { AdminService } from './admin.service';
 import { Roles } from '@/common/decorators/roles.decorator';
 import { UserRole } from '@prisma/client';
@@ -32,7 +26,7 @@ export class AdminController {
   @ApiQuery({ name: 'limit', required: false, type: Number })
   async getAllUsers(
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
-    @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit: number,
+    @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit: number
   ) {
     return this.adminService.getAllUsers(page, limit);
   }
@@ -57,7 +51,7 @@ export class AdminController {
   @ApiQuery({ name: 'limit', required: false, type: Number })
   async getAllAssets(
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
-    @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit: number,
+    @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit: number
   ) {
     return this.adminService.getAllAssets(page, limit);
   }

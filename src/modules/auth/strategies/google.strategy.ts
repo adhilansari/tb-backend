@@ -10,7 +10,7 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
 
   constructor(
     configService: ConfigService,
-    private readonly prisma: PrismaService,
+    private readonly prisma: PrismaService
   ) {
     const clientID = configService.get('GOOGLE_CLIENT_ID');
     const clientSecret = configService.get('GOOGLE_CLIENT_SECRET');
@@ -38,7 +38,7 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
     _accessToken: string,
     _refreshToken: string,
     profile: any,
-    done: VerifyCallback,
+    done: VerifyCallback
   ): Promise<any> {
     const { emails, displayName, photos } = profile;
     const email = emails?.[0]?.value;

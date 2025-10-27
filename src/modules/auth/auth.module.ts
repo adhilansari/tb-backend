@@ -28,4 +28,4 @@ import { StorageModule } from '@/common/storage/storage.module';
   providers: [AuthService, JwtStrategy],
   exports: [AuthService, JwtStrategy],
 })
-export class AuthModule { }
+export class AuthModule {}
