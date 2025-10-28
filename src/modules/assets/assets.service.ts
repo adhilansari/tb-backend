@@ -18,7 +18,7 @@ export class AssetsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly storage: StorageService
-  ) {}
+  ) { }
 
   async create(
     userId: string,
@@ -160,16 +160,16 @@ export class AssetsService {
     ]);
 
     // Get liked asset IDs for the current user if authenticated
-    let likedAssetIds: Set<string> = new Set();
+    let likedAssetIds = new Set<string>();
     if (userId) {
       const likes = await this.prisma.like.findMany({
         where: {
           userId,
-          assetId: { in: assets.map(a => a.id) },
+          assetId: { in: assets.map((a) => a.id) },
         },
         select: { assetId: true },
       });
-      likedAssetIds = new Set(likes.map(l => l.assetId));
+      likedAssetIds = new Set(likes.map((l) => l.assetId));
     }
 
     const assetsWithPresignedUrls = await Promise.all(
@@ -214,16 +214,16 @@ export class AssetsService {
     });
 
     // Get liked asset IDs for the current user if authenticated
-    let likedAssetIds: Set<string> = new Set();
+    let likedAssetIds = new Set<string>();
     if (userId) {
       const likes = await this.prisma.like.findMany({
         where: {
           userId,
-          assetId: { in: assets.map(a => a.id) },
+          assetId: { in: assets.map((a) => a.id) },
         },
         select: { assetId: true },
       });
-      likedAssetIds = new Set(likes.map(l => l.assetId));
+      likedAssetIds = new Set(likes.map((l) => l.assetId));
     }
 
     return Promise.all(
@@ -256,16 +256,16 @@ export class AssetsService {
     });
 
     // Get liked asset IDs for the current user if authenticated
-    let likedAssetIds: Set<string> = new Set();
+    let likedAssetIds = new Set<string>();
     if (userId) {
       const likes = await this.prisma.like.findMany({
         where: {
           userId,
-          assetId: { in: assets.map(a => a.id) },
+          assetId: { in: assets.map((a) => a.id) },
         },
         select: { assetId: true },
       });
-      likedAssetIds = new Set(likes.map(l => l.assetId));
+      likedAssetIds = new Set(likes.map((l) => l.assetId));
     }
 
     return Promise.all(
@@ -329,8 +329,8 @@ export class AssetsService {
 
     const isLiked = userId
       ? !!(await this.prisma.like.findUnique({
-          where: { userId_assetId: { userId, assetId: id } },
-        }))
+        where: { userId_assetId: { userId, assetId: id } },
+      }))
       : false;
 
     const transformedAsset = await this.transformAssetUrls(asset);
@@ -592,7 +592,27 @@ export class AssetsService {
       data: { downloads: { increment: 1 } },
     });
 
-    const downloadUrl = await this.storage.getPresignedUrl(asset.fileUrl, 3600);
+    // Detect file type and use appropriate URL generation
+    const ext = asset.fileUrl.split('.').pop()?.toLowerCase();
+    const isVideoOrAudio = [
+      'mp4',
+      'm4v',
+      'mov',
+      'avi',
+      'webm',
+      'mkv',
+      'mp3',
+      'wav',
+      'ogg',
+      'aac',
+      'm4a',
+      'flac',
+    ].includes(ext || '');
+
+    const downloadUrl = isVideoOrAudio
+      ? await this.storage.getStreamingUrl(asset.fileUrl, 7200) // 2 hours for downloads
+      : await this.storage.getPresignedUrl(asset.fileUrl, 7200);
+
     return { downloadUrl };
   }
 
@@ -661,15 +681,38 @@ export class AssetsService {
       ? await this.storage.getPresignedUrl(asset.thumbnailUrl, 3600)
       : null;
 
-    const fileUrl = asset.fileUrl ? await this.storage.getPresignedUrl(asset.fileUrl, 3600) : null;
+    // Detect if file is video/audio and use streaming URL
+    let fileUrl = null;
+    if (asset.fileUrl) {
+      const ext = asset.fileUrl.split('.').pop()?.toLowerCase();
+      const isVideoOrAudio = [
+        'mp4',
+        'm4v',
+        'mov',
+        'avi',
+        'webm',
+        'mkv',
+        'mp3',
+        'wav',
+        'ogg',
+        'aac',
+        'm4a',
+        'flac',
+      ].includes(ext || '');
+
+      // Use streaming URL for video/audio, regular URL for others
+      fileUrl = isVideoOrAudio
+        ? await this.storage.getStreamingUrl(asset.fileUrl, 3600)
+        : await this.storage.getPresignedUrl(asset.fileUrl, 3600);
+    }
 
     const creator = asset.creator
       ? {
-          ...asset.creator,
-          avatarUrl: asset.creator.avatarUrl
-            ? await this.storage.getPresignedUrl(asset.creator.avatarUrl, 3600)
-            : null,
-        }
+        ...asset.creator,
+        avatarUrl: asset.creator.avatarUrl
+          ? await this.storage.getPresignedUrl(asset.creator.avatarUrl, 3600)
+          : null,
+      }
       : undefined;
 
     return {

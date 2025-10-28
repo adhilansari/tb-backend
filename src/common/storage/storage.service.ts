@@ -10,8 +10,7 @@ import {
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 /**
- * Storage Service - Handles file uploads to Cloudflare R2
- * Uses S3-compatible API
+ * Storage Service - Fixed for video streaming
  */
 @Injectable()
 export class StorageService {
@@ -117,7 +116,7 @@ export class StorageService {
   private readonly allowed3DModelTypes = [
     'model/gltf+json',
     'model/gltf-binary',
-    'application/octet-stream', // for .glb, .fbx, .obj
+    'application/octet-stream',
   ];
 
   private readonly allowedFileTypes = [
@@ -156,7 +155,7 @@ export class StorageService {
   }
 
   /**
-   * Upload file to R2
+   * Upload file to R2 with proper content type
    */
   async uploadFile(
     file: Express.Multer.File,
@@ -167,21 +166,29 @@ export class StorageService {
     const key = this.generateFileKey(file.originalname, folder);
 
     try {
+      // Detect proper content type
+      const contentType = this.getProperContentType(file);
+
       const command = new PutObjectCommand({
         Bucket: this.bucketName,
         Key: key,
         Body: file.buffer,
-        ContentType: file.mimetype,
+        ContentType: contentType,
+        // Add cache control for videos
+        CacheControl: this.isVideoFile(file.mimetype)
+          ? 'public, max-age=31536000'
+          : 'public, max-age=86400',
         Metadata: {
           originalName: file.originalname,
           uploadedAt: new Date().toISOString(),
+          originalMimeType: file.mimetype,
         },
       });
 
       await this.s3Client.send(command);
 
       const url = `${this.publicUrl}/${key}`;
-      this.logger.log(`File uploaded successfully: ${key}`);
+      this.logger.log(`✅ File uploaded: ${key} (${contentType})`);
 
       return { key, url };
     } catch (error) {
@@ -193,31 +200,87 @@ export class StorageService {
   }
 
   /**
-   * Generate presigned URL for temporary access
+   * Get proper content type based on file extension and mime type
    */
-  async getPresignedUrl(key: string, expiresIn = 3600, forVideo = false): Promise<string> {
+  private getProperContentType(file: Express.Multer.File): string {
+    const ext = file.originalname.split('.').pop()?.toLowerCase();
+
+    // Video files - ensure proper content type
+    if (this.isVideoFile(file.mimetype)) {
+      const videoTypes: Record<string, string> = {
+        mp4: 'video/mp4',
+        m4v: 'video/mp4',
+        mov: 'video/quicktime',
+        avi: 'video/x-msvideo',
+        webm: 'video/webm',
+        mkv: 'video/x-matroska',
+        flv: 'video/x-flv',
+        '3gp': 'video/3gpp',
+        ogv: 'video/ogg',
+      };
+      return videoTypes[ext || ''] || 'video/mp4';
+    }
+
+    // Audio files
+    if (this.isAudioFile(file.mimetype)) {
+      const audioTypes: Record<string, string> = {
+        mp3: 'audio/mpeg',
+        wav: 'audio/wav',
+        ogg: 'audio/ogg',
+        webm: 'audio/webm',
+        aac: 'audio/aac',
+        m4a: 'audio/mp4',
+        flac: 'audio/flac',
+      };
+      return audioTypes[ext || ''] || 'audio/mpeg';
+    }
+
+    return file.mimetype;
+  }
+
+  /**
+   * Generate presigned URL with proper headers for streaming
+   */
+  async getPresignedUrl(key: string, expiresIn = 3600, forStreaming = false): Promise<string> {
     try {
+      // Detect file type from key
+      const ext = key.split('.').pop()?.toLowerCase();
+      const isVideo = ['mp4', 'm4v', 'mov', 'avi', 'webm', 'mkv'].includes(ext || '');
+      const isAudio = ['mp3', 'wav', 'ogg', 'aac', 'm4a', 'flac'].includes(ext || '');
+
       const commandParams: any = {
         Bucket: this.bucketName,
         Key: key,
       };
 
-      // Add mobile-friendly headers for video streaming
-      if (forVideo) {
-        commandParams.ResponseContentType = 'video/mp4';
-        commandParams.ResponseCacheControl = 'max-age=3600';
-        // Enable range requests for mobile video seeking
+      // Add streaming-specific headers for video/audio
+      if (forStreaming || isVideo || isAudio) {
+        // Set proper content type
+        if (isVideo) {
+          commandParams.ResponseContentType = this.getContentTypeFromExtension(ext!);
+        } else if (isAudio) {
+          commandParams.ResponseContentType = `audio/${ext === 'mp3' ? 'mpeg' : ext}`;
+        }
+
+        // Enable range requests for seeking
         commandParams.ResponseAcceptRanges = 'bytes';
+
+        // Cache control
+        commandParams.ResponseCacheControl = 'public, max-age=31536000';
+
+        // Allow inline display
+        commandParams.ResponseContentDisposition = 'inline';
       }
 
       const command = new GetObjectCommand(commandParams);
 
       const url = await getSignedUrl(this.s3Client, command, {
         expiresIn,
-        // Ensure CORS headers are included
-        unhoistableHeaders: new Set(['x-amz-server-side-encryption']),
       });
 
+      this.logger.log(
+        `✅ Generated presigned URL for ${key} (streaming: ${forStreaming || isVideo})`
+      );
       return url;
     } catch (error) {
       this.logger.error(`Failed to generate presigned URL: ${JSON.stringify(error)}`);
@@ -226,7 +289,25 @@ export class StorageService {
   }
 
   /**
-   * Get streaming-optimized URL for video/audio
+   * Get content type from file extension
+   */
+  private getContentTypeFromExtension(ext: string): string {
+    const types: Record<string, string> = {
+      mp4: 'video/mp4',
+      m4v: 'video/mp4',
+      mov: 'video/quicktime',
+      avi: 'video/x-msvideo',
+      webm: 'video/webm',
+      mkv: 'video/x-matroska',
+      flv: 'video/x-flv',
+      '3gp': 'video/3gpp',
+      ogv: 'video/ogg',
+    };
+    return types[ext] || 'video/mp4';
+  }
+
+  /**
+   * Get streaming URL (alias for getPresignedUrl with streaming flag)
    */
   async getStreamingUrl(key: string, expiresIn = 3600): Promise<string> {
     return this.getPresignedUrl(key, expiresIn, true);
@@ -270,17 +351,29 @@ export class StorageService {
   }
 
   /**
+   * Check if mime type is video
+   */
+  private isVideoFile(mimeType: string): boolean {
+    return this.allowedVideoTypes.includes(mimeType);
+  }
+
+  /**
+   * Check if mime type is audio
+   */
+  private isAudioFile(mimeType: string): boolean {
+    return this.allowedAudioTypes.includes(mimeType);
+  }
+
+  /**
    * Validate file type and size
    */
   private validateFile(file: Express.Multer.File): void {
-    // Check file type
     if (!this.allowedFileTypes.includes(file.mimetype)) {
       throw new Error(
         `Invalid file type: ${file.mimetype}. Please upload a supported file format.`
       );
     }
 
-    // Determine max size based on file type
     let maxSize = this.MAX_FILE_SIZE;
     if (this.allowedImageTypes.includes(file.mimetype)) {
       maxSize = this.MAX_IMAGE_SIZE;
@@ -290,7 +383,6 @@ export class StorageService {
       maxSize = this.MAX_AUDIO_SIZE;
     }
 
-    // Check file size
     if (file.size > maxSize) {
       const maxSizeMB =
         maxSize >= 1024 * 1024 * 1024
@@ -306,7 +398,7 @@ export class StorageService {
   }
 
   /**
-   * Generate unique file key with timestamp and random string
+   * Generate unique file key
    */
   private generateFileKey(originalName: string, folder: string): string {
     const timestamp = Date.now();
