@@ -32,7 +32,7 @@ import { Public } from '@/common/decorators/public.decorator';
 @ApiTags('Assets')
 @Controller('assets')
 export class AssetsController {
-  constructor(private readonly assetsService: AssetsService) {}
+  constructor(private readonly assetsService: AssetsService) { }
 
   @Post()
   @ApiBearerAuth()

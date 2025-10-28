@@ -185,7 +185,7 @@ export class StorageService {
 
       return { key, url };
     } catch (error) {
-      this.logger.error(`Failed to upload file: ${error}`);
+      this.logger.error(`Failed to upload file: ${JSON.stringify(error)}`);
       throw new Error(
         `File upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`
       );
@@ -195,19 +195,41 @@ export class StorageService {
   /**
    * Generate presigned URL for temporary access
    */
-  async getPresignedUrl(key: string, expiresIn = 3600): Promise<string> {
+  async getPresignedUrl(key: string, expiresIn = 3600, forVideo = false): Promise<string> {
     try {
-      const command = new GetObjectCommand({
+      const commandParams: any = {
         Bucket: this.bucketName,
         Key: key,
+      };
+
+      // Add mobile-friendly headers for video streaming
+      if (forVideo) {
+        commandParams.ResponseContentType = 'video/mp4';
+        commandParams.ResponseCacheControl = 'max-age=3600';
+        // Enable range requests for mobile video seeking
+        commandParams.ResponseAcceptRanges = 'bytes';
+      }
+
+      const command = new GetObjectCommand(commandParams);
+
+      const url = await getSignedUrl(this.s3Client, command, {
+        expiresIn,
+        // Ensure CORS headers are included
+        unhoistableHeaders: new Set(['x-amz-server-side-encryption']),
       });
 
-      const url = await getSignedUrl(this.s3Client, command, { expiresIn });
       return url;
     } catch (error) {
-      this.logger.error(`Failed to generate presigned URL: ${error}`);
+      this.logger.error(`Failed to generate presigned URL: ${JSON.stringify(error)}`);
       throw new Error('Failed to generate download URL');
     }
+  }
+
+  /**
+   * Get streaming-optimized URL for video/audio
+   */
+  async getStreamingUrl(key: string, expiresIn = 3600): Promise<string> {
+    return this.getPresignedUrl(key, expiresIn, true);
   }
 
   /**
@@ -223,7 +245,7 @@ export class StorageService {
       await this.s3Client.send(command);
       this.logger.log(`File deleted successfully: ${key}`);
     } catch (error) {
-      this.logger.error(`Failed to delete file: ${error}`);
+      this.logger.error(`Failed to delete file: ${JSON.stringify(error)}`);
       throw new Error(
         `File deletion failed: ${error instanceof Error ? error.message : 'Unknown error'}`
       );
@@ -242,7 +264,7 @@ export class StorageService {
 
       await this.s3Client.send(command);
       return true;
-    } catch (error) {
+    } catch {
       return false;
     }
   }
