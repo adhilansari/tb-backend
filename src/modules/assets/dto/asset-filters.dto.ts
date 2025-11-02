@@ -66,4 +66,16 @@ export class AssetFiltersDto {
   @IsOptional()
   @IsString()
   creatorId?: string;
+
+  @ApiPropertyOptional({ description: 'Filter featured assets only' })
+  @IsOptional()
+  @Type(() => Boolean)
+  @IsBoolean()
+  featured?: boolean;
+
+  @ApiPropertyOptional({ description: 'Filter trending assets only' })
+  @IsOptional()
+  @Type(() => Boolean)
+  @IsBoolean()
+  trending?: boolean;
 }
