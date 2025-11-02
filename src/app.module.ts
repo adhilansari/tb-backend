@@ -29,6 +29,7 @@ import { AdminModule } from './modules/admin/admin.module';
 import { FilesModule } from './modules/files/files.module';
 import { PaymentsModule } from './modules/payments/payments.module';
 import { RefundsModule } from './modules/refunds/refunds.module';
+import { AppConfigModule } from './modules/config/config.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
@@ -65,6 +66,7 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
     FilesModule,
     PaymentsModule,
     RefundsModule,
+    AppConfigModule,
   ],
   controllers: [AppController],
   providers: [

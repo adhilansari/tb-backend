@@ -14,6 +14,30 @@ export class UsersService {
     private readonly razorpay: RazorpayService
   ) {}
 
+  async findById(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId, deletedAt: null },
+      select: {
+        id: true,
+        username: true,
+        displayName: true,
+        email: true,
+        avatarUrl: true,
+        bio: true,
+        role: true,
+        verified: true,
+        createdAt: true,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    // Transform avatar URL to presigned URL if it exists
+    return this.transformUserAvatarUrl(user);
+  }
+
   async findByUsername(username: string) {
     const user = await this.prisma.user.findUnique({
       where: { username, deletedAt: null },

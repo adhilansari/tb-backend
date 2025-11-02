@@ -34,6 +34,13 @@ import { Public } from '@/common/decorators/public.decorator';
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
+  @Get('me')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get current user info' })
+  async getCurrentUser(@Request() req: any) {
+    return this.usersService.findById(req.user.id);
+  }
+
   @Public()
   @Get(':username')
   @ApiOperation({ summary: 'Get user profile by username (public)' })
