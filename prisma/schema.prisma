@@ -25,6 +25,13 @@ enum AssetType {
   TEMPLATE
   PLUGIN
   FONT
+  VECTOR
+  ICON
+  THREE_D_MODEL
+  PRESET
+  TEXTURE
+  BRUSH
+  OTHER
 }
 
 enum AssetCategory {
